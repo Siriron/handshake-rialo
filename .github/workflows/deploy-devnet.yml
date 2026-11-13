@@ -1,6 +1,6 @@
-# Smoke-deploys Handshake to Rialo devnet from a Linux runner using a
-# throwaway CI key, then publishes the output (never key material) to the
-# deploy-results branch. Run manually from the Actions tab.
+# Deploys Handshake to Rialo devnet from a Linux runner using persistent keys
+# stored as repository secrets, then publishes the output (never key material)
+# to the deploy-results branch. Run manually from the Actions tab.
 name: deploy-devnet
 on: workflow_dispatch
 permissions:
@@ -10,6 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write   # only to publish the output branch
+    env:
+      DEPLOYER_B64: ${{ secrets.HS_DEPLOYER_KEYPAIR }}
+      PROGRAM_B64: ${{ secrets.HS_PROGRAM_KEYPAIR }}
+      REX_B64: ${{ secrets.HS_REX_KEYPAIR }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -22,34 +26,39 @@ jobs:
           set +e
           exec > >(tee deploy.log) 2>&1
           curl -fsSL https://rialo-artifacts.s3.us-east-2.amazonaws.com/rialoman/stable/install.sh -o install.sh
-          bash install.sh < /dev/null
+          bash install.sh < /dev/null > /dev/null 2>&1
           export PATH="$HOME/.local/share/rialo/bin:$PATH"
-          rialoman install stable@0.18.1 && rialoman use stable@0.18.1
+          rialoman install stable@0.18.1 > /dev/null 2>&1; rialoman use stable@0.18.1 > /dev/null 2>&1
           export PATH="$(dirname "$(rialoman which rialo)"):$PATH"
           rialo --version
-          echo "== devnet health"
-          curl -s -m 10 -X POST -H 'content-type: application/json' https://devnet.rialo.io -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}'; echo
-          echo "== key"
-          rialo keytool generate ci --no-setup
-          ADDR="$(rialo keytool address --alias ci --no-setup 2>&1 | tail -1)"
-          echo "deployer address: $ADDR"
-          echo "== airdrops (faucet gives about 1 RLO each)"
-          for i in 1 2 3; do
-            rialo -n devnet -a ci client airdrop --amount 1 --no-setup 2>&1 | tail -4
+          mkdir -p keys
+          printf '%s' "$DEPLOYER_B64" | base64 -d > keys/deployer.keypair
+          printf '%s' "$PROGRAM_B64" | base64 -d > keys/program.keypair
+          printf '%s' "$REX_B64" | base64 -d > keys/rex.keypair
+          chmod 600 keys/*
+          echo "== addresses (expected: deployer G839F16y..., program 5umz6vh9..., rex 7pycwurx...)"
+          for k in deployer program rex; do
+            echo "$k: $(rialo keytool address --keypair keys/$k.keypair --no-setup 2>&1 | tail -1)"
+          done
+          rialo keytool attach hs-deployer keys/deployer.keypair --no-setup 2>&1 | tail -2
+          echo "== fund the deployer to at least 3 RLO"
+          for i in 1 2 3 4 5 6; do
+            b="$(rialo -n devnet -a hs-deployer client balance --no-setup 2>&1 | tail -1)"
+            echo "balance: $b"
+            num="$(echo "$b" | awk '{print $1}')"
+            if awk "BEGIN{exit !(($num+0) >= 3.0)}"; then break; fi
+            rialo -n devnet -a hs-deployer client airdrop --amount 1 --no-setup 2>&1 | tail -2
             sleep 3
           done
-          rialo -n devnet -a ci client balance --no-setup 2>&1 | tail -3
-          echo "== diagnose airdrop if the balance is empty"
-          rialo -n devnet doctor airdrop 2>&1 | tail -15
           echo "== generate WIT and manifest"
-          cargo check --manifest-path program/Cargo.toml 2>&1 | tail -3
-          ls program/wit
+          cargo check --manifest-path program/Cargo.toml 2>&1 | tail -2
           echo "== build artifact"
-          cargo build --manifest-path program/artifact/Cargo.toml 2>&1 | tail -6
+          cargo build --manifest-path program/artifact/Cargo.toml 2>&1 | tail -3
           echo "== deploy-venus"
-          rialo -n devnet -a ci client program deploy-venus program --no-setup 2>&1 | tail -40
+          rialo -n devnet -a hs-deployer client program deploy-venus program \
+            --keypair keys/program.keypair --rex-keypair keys/rex.keypair --no-setup 2>&1 | tail -30
           echo "== balance after deploy"
-          rialo -n devnet -a ci client balance --no-setup 2>&1 | tail -3
+          rialo -n devnet -a hs-deployer client balance --no-setup 2>&1 | tail -1
       - name: publish output
         if: always()
         shell: bash
@@ -57,7 +66,7 @@ jobs:
           mkdir -p /tmp/report
           {
             echo "commit: $GITHUB_SHA"; echo "run: $GITHUB_RUN_ID"; echo "job-status: ${{ job.status }}"
-            echo; sed 's/\x1b\[[0-9;]*[A-Za-z]//g' deploy.log | tail -n 400
+            echo; sed 's/\x1b\[[0-9;]*[A-Za-z]//g' deploy.log | tail -n 200
           } > /tmp/report/deploy-result.txt
           cd /tmp/report
           git init -q; git checkout -q -b deploy-results

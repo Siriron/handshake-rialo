@@ -20,9 +20,11 @@ use rialo_venus_proc_macro::rialo;
 pub const BEAT_MS: u64 = 10_000;
 /// Wait between inconclusive checks (ms); same ceiling as above.
 pub const RETRY_MS: u64 = 8_000;
-/// The deployed REX component account. Replace after the first deploy; the
-/// placeholder (system program id) makes `create` fail closed until then.
-pub const AUTHORIZED_REX: &str = "11111111111111111111111111111111";
+/// The REX component program id. It is deterministic: the deploy workflow
+/// passes the REX keypair (a repo secret) to `deploy-venus --rex-keypair`, so
+/// this address is known before the first deploy. If the deployed REX account
+/// ever differs from this value, `create` fails closed.
+pub const AUTHORIZED_REX: &str = "7pycwurxgfQMaTN9KMbHqn8vCcBzgZhJKvB4epLyjpH3";
 
 pub mod deal {
     pub const CREATED: u64 = 0;
