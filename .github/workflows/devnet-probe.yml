@@ -26,21 +26,26 @@ jobs:
           curl -fsSL https://rialo-artifacts.s3.us-east-2.amazonaws.com/rialoman/stable/install.sh -o install.sh
           echo "curl exit $?"; head -c 1200 install.sh; echo
           bash install.sh
-          export PATH="$HOME/.local/share/rialo/bin:$HOME/.rialo/bin:$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
-          echo "== where did it land"; command -v rialoman rialo
-          find "$HOME" -maxdepth 4 \( -name 'rialo*' -o -name '.rialo*' \) -not -path '*/.cargo/registry/*' 2>/dev/null | head -20
+          export PATH="$HOME/.local/share/rialo/bin:$PATH"
           echo "== rialoman"; rialoman --help
           rialoman install stable@0.18.1
-          export PATH="$HOME/.local/share/rialo/bin:$HOME/.rialo/bin:$PATH"
+          rialoman use stable@0.18.1
+          echo "== current / list"; rialoman current; rialoman list
+          echo "== which rialo"; rialoman which rialo
+          echo "== rialo home tree"
+          find "$HOME/.local/share/rialo" -maxdepth 4 2>/dev/null | head -60
+          RIALO_BIN="$(rialoman which rialo 2>/dev/null)"
+          if [ -n "$RIALO_BIN" ]; then export PATH="$(dirname "$RIALO_BIN"):$PATH"; fi
           echo "== rialo version"; rialo --version
-          echo "== rialo --help"; rialo --help
-          echo "== rialo client --help"; rialo client --help
-          echo "== rialo client program --help"; rialo client program --help
-          echo "== deploy-venus --help"; rialo client program deploy-venus --help
-          echo "== invoke --help"; rialo client program invoke --help
+          echo "== rialoman toolchain --help"; rialoman toolchain --help
+          for c in "" "client" "client program" "client program deploy-venus" "client program invoke" "client transaction" "account" "keys" "wallet" "config" "faucet" "airdrop"; do
+            echo "== rialo $c --help"; rialo $c --help 2>&1 | head -45
+          done
           echo "== devnet reachability"
-          curl -s -m 10 -o /dev/null -w "devnet.rialo.io http=%{http_code}\n" https://devnet.rialo.io
           curl -s -m 10 -X POST -H 'content-type: application/json' https://devnet.rialo.io -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}' | head -c 300; echo
+          echo "== cargo +rialo"; cargo +rialo --version
+          echo "== build program artifact"
+          (cargo build --manifest-path program/artifact/Cargo.toml 2>&1 || cargo +rialo build --manifest-path program/artifact/Cargo.toml 2>&1) | tail -70
       - name: publish probe output
         if: always()
         shell: bash
