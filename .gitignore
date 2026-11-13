@@ -1,0 +1,10 @@
+target/
+**/target/
+program/wit/
+node_modules/
+.env
+.env.*
+*.key
+*.keypair
+keypair*.json
+.DS_Store

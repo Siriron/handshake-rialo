@@ -1,0 +1,27 @@
+[package]
+name = "handshake"
+version = "0.1.0"
+edition = "2021"
+description = "Handshake: milestone escrow on Rialo. Validators verify real-world evidence; funds pay out or refund themselves."
+license = "Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[features]
+default = ["implementation"]
+implementation = []
+custom-heap = []
+custom-panic = []
+
+[dependencies]
+rialo-venus = "=0.18.1"
+rialo-venus-proc-macro = "=0.18.1"
+handshake-core = { path = "../core" }
+
+[package.metadata.rex.dependencies]
+serde_json = "1"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

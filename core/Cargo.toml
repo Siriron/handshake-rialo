@@ -1,0 +1,7 @@
+[package]
+name = "handshake-core"
+version = "0.1.0"
+edition = "2021"
+description = "Pure logic for Handshake: input validation, report classification, settlement accounting"
+license = "Apache-2.0"
+publish = false

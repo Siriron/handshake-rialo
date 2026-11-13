@@ -1,0 +1,28 @@
+# UNTESTED first step toward deploying from GitHub. Installs the Rialo toolchain
+# on a Linux runner and prints the CLI help so the real deploy commands can be
+# written from the output. Run manually from the Actions tab.
+name: devnet-probe
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+      - name: Install rialoman
+        run: curl -fsSL https://rialo-artifacts.s3.us-east-2.amazonaws.com/rialoman/stable/install.sh | bash
+      - name: Install Rialo 0.18.1
+        run: |
+          export PATH="$HOME/.local/share/rialo/bin:$PATH"
+          rialoman install stable@0.18.1
+          rialo --version
+      - name: Print CLI surface
+        run: |
+          export PATH="$HOME/.local/share/rialo/bin:$PATH"
+          rialo --help
+          rialo client --help
+          rialo client program --help
+          rialo client program deploy-venus --help || true
+          rialo client program invoke --help || true

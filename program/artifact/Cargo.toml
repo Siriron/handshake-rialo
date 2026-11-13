@@ -1,0 +1,11 @@
+[package]
+name = "handshake-artifact"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[build-dependencies]
+rialo-build-lib = "=0.18.1"
+rialo-venus-build-helper = "=0.18.1"
+
+[workspace]
