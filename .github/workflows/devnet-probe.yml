@@ -38,14 +38,15 @@ jobs:
           if [ -n "$RIALO_BIN" ]; then export PATH="$(dirname "$RIALO_BIN"):$PATH"; fi
           echo "== rialo version"; rialo --version
           echo "== rialoman toolchain --help"; rialoman toolchain --help
-          for c in "" "client" "client program" "client program deploy-venus" "client program invoke" "client transaction" "account" "keys" "wallet" "config" "faucet" "airdrop"; do
-            echo "== rialo $c --help"; rialo $c --help 2>&1 | head -45
+          for c in "keytool" "keytool generate" "keytool list" "keytool address" "client airdrop" "client balance" "client rex" "doctor" "venus" "config network"; do
+            echo "== rialo $c --help"; rialo $c --help 2>&1 | grep -v '^\s*$' | head -40
           done
-          echo "== devnet reachability"
-          curl -s -m 10 -X POST -H 'content-type: application/json' https://devnet.rialo.io -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}' | head -c 300; echo
-          echo "== cargo +rialo"; cargo +rialo --version
           echo "== build program artifact"
-          (cargo build --manifest-path program/artifact/Cargo.toml 2>&1 || cargo +rialo build --manifest-path program/artifact/Cargo.toml 2>&1) | tail -70
+          touch /tmp/before-build
+          (cargo build --manifest-path program/artifact/Cargo.toml 2>&1 || cargo +rialo build --manifest-path program/artifact/Cargo.toml 2>&1) | tail -8
+          echo "== files produced by the build"
+          find program -type f -newer /tmp/before-build \( -name '*.polkavm' -o -name '*.elf' -o -name '*.wasm' -o -name '*.json' -o -name '*.so' \) -not -path '*/registry/*' -exec ls -la {} \; 2>/dev/null | head -20
+          echo "== wit dir"; ls -la program/wit 2>/dev/null
       - name: publish probe output
         if: always()
         shell: bash
