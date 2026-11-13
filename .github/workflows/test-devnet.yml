@@ -1,0 +1,87 @@
+# Runs a live two-milestone deal on Rialo devnet against the deployed program:
+# milestone 1 verifies a real GitHub release (expect: paid), milestone 2 a tag
+# that does not exist (expect: refunded). Output (never keys) goes to the
+# test-results branch. Run manually from the Actions tab.
+name: test-devnet
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  scenario:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # only to publish the output branch
+    env:
+      DEPLOYER_B64: ${{ secrets.HS_DEPLOYER_KEYPAIR }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+      - name: scenario
+        shell: bash
+        continue-on-error: true
+        run: |
+          set +e
+          exec > >(tee test.log) 2>&1
+          PROGRAM=5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+          REX=7pycwurxgfQMaTN9KMbHqn8vCcBzgZhJKvB4epLyjpH3
+          curl -fsSL https://rialo-artifacts.s3.us-east-2.amazonaws.com/rialoman/stable/install.sh -o install.sh
+          bash install.sh < /dev/null > /dev/null 2>&1
+          export PATH="$HOME/.local/share/rialo/bin:$PATH"
+          rialoman install stable@0.18.1 > /dev/null 2>&1; rialoman use stable@0.18.1 > /dev/null 2>&1
+          export PATH="$(dirname "$(rialoman which rialo)"):$PATH"
+          mkdir -p keys
+          printf '%s' "$DEPLOYER_B64" | base64 -d > keys/deployer.keypair; chmod 600 keys/*
+          rialo keytool attach hs-deployer keys/deployer.keypair --no-setup 2>&1 | tail -1
+          rialo keytool generate hs-seller --no-setup > seller.out 2>&1
+          SELLER="$(grep -o 'public key: [A-Za-z0-9]*' seller.out | awk '{print $3}')"
+          BUYER="$(rialo keytool address --alias hs-deployer --no-setup 2>&1 | tail -1)"
+          echo "buyer:  $BUYER"; echo "seller: $SELLER"
+          bal() { rialo -n devnet client balance "$1" --no-setup 2>&1 | tail -1 | awk '{print $1}'; }
+          echo "== top up buyer to at least 1.5 RLO"
+          for i in 1 2 3 4; do
+            b="$(bal "$BUYER")"; echo "buyer balance: $b"
+            if awk "BEGIN{exit !(($b+0) >= 1.5)}"; then break; fi
+            rialo -n devnet -a hs-deployer client airdrop --amount 1 --no-setup 2>&1 | tail -1; sleep 3
+          done
+          echo "== generate manifest"; cargo check --manifest-path program/Cargo.toml 2>&1 | tail -1
+          inv() { echo "-- invoke $*"; rialo -n devnet -a hs-deployer client program invoke "$PROGRAM" --program-dir program "$@" --no-setup 2>&1 | tail -22; }
+          SLUG="$(openssl rand -hex 32)"; echo "slug: $SLUG"
+          SELLER_START="$(bal "$SELLER")"; BUYER_START="$(bal "$BUYER")"
+          echo "start: buyer=$BUYER_START seller=$SELLER_START"
+          echo "== create"
+          inv --function create --rex-bytecode-account "$REX" --arg workflow_pda_slug="$SLUG" --arg payee="$SELLER"
+          D1=$(( $(date +%s%3N) + 100000 )); D2=$(( D1 + 70000 ))
+          echo "deadlines: D1=$D1 D2=$D2 (now $(date +%s%3N))"
+          echo "== add milestone 1 (release exists: expect PAID)"
+          inv --function add_milestone --arg workflow_pda_slug="$SLUG" --arg amount_kelvin=50000000 --arg deadline_ms=$D1 --arg kind=1 --arg target='Siriron/handshake-rialo@v0.1.0'
+          echo "== add milestone 2 (tag absent: expect REFUNDED)"
+          inv --function add_milestone --arg workflow_pda_slug="$SLUG" --arg amount_kelvin=50000000 --arg deadline_ms=$D2 --arg kind=1 --arg target='Siriron/handshake-rialo@v9.9.9'
+          echo "== fund"
+          inv --function fund --arg workflow_pda_slug="$SLUG"
+          echo "funded at $(date +%s%3N); waiting for deadlines and checks"
+          END=$(( D2 + 150000 ))
+          while [ "$(date +%s%3N)" -lt "$END" ]; do
+            echo "t=$(date +%H:%M:%S) buyer=$(bal "$BUYER") seller=$(bal "$SELLER")"
+            sleep 25
+          done
+          echo "== final"
+          echo "buyer:  start=$BUYER_START end=$(bal "$BUYER")"
+          echo "seller: start=$SELLER_START end=$(bal "$SELLER")  (expect +0.05 RLO)"
+          echo "== recent transactions"
+          rialo -n devnet -a hs-deployer client get-transactions --no-setup 2>&1 | tail -40
+      - name: publish output
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p /tmp/report
+          {
+            echo "commit: $GITHUB_SHA"; echo "run: $GITHUB_RUN_ID"; echo "job-status: ${{ job.status }}"
+            echo; sed 's/\x1b\[[0-9;]*[A-Za-z]//g' test.log | tail -n 260
+          } > /tmp/report/test-result.txt
+          cd /tmp/report
+          git init -q; git checkout -q -b test-results
+          git config user.name "github-actions"; git config user.email "actions@users.noreply.github.com"
+          git add test-result.txt; git commit -q -m "test output for $GITHUB_SHA"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" test-results
