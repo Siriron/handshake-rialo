@@ -27,8 +27,9 @@ token, or speculation.
 - `mock-endpoint/` demo status endpoint for kind 0 (Vercel function).
 
 ## Status
-- VERIFIED here: `cargo test` passes for `core` (17 tests); `cargo check` passes
-  for the program and its generated REX component (Venus 0.18.1, zero warnings).
+- VERIFIED on a clean GitHub runner (see the `ci` workflow): `cargo test` passes for
+  `core` (17 tests); `cargo check` passes for the program and its generated REX
+  component (Venus 0.18.1).
 - NOT VERIFIED: PolkaVM and WASM artifact builds, deployment, and any runtime
   behaviour on devnet. The `devnet-probe` workflow is the first step.
 - Not built yet: the frontend and the receipt page.
@@ -37,7 +38,15 @@ token, or speculation.
     cargo test --manifest-path core/Cargo.toml
     cargo check --manifest-path program/Cargo.toml   # needs Rust 1.85+
 
-## Before deploying
-Set the REX URL in `program/src/lib.rs` (kind 0 only) and `AUTHORIZED_REX` after
-the first deploy. Deploy and invoke commands are in the sibling `rex-escrow`
-README and will be confirmed against real runs.
+## Deploying (planned; commands follow Merit's published DevNet evidence)
+Not yet run for this program, so treat every line as unconfirmed.
+
+    rialoman install stable@0.18.1          # also: rustup target add wasm32-wasip2
+    cargo build --manifest-path program/artifact/Cargo.toml
+    rialo client program deploy-venus program   # prints program id + REX bytecode account
+
+Then set `AUTHORIZED_REX` in `program/src/lib.rs` to the printed REX account
+(until then `create` fails closed), rebuild, and redeploy. Every call names the
+deal by a random 32-byte hex `workflow_pda_slug` and passes
+`--rex-bytecode-account`. Kind 0 also needs your endpoint URL set in the REX
+function. DevNet timers expire after about 15 s, so every timer here is under 11 s.
