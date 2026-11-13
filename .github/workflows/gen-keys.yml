@@ -28,21 +28,21 @@ jobs:
             rialo keytool generate $a --no-setup 2>&1 | sed 's/^Keypair created at: [^,]*, //'
           done
           cat > pub.pem <<'PEM'
------BEGIN PUBLIC KEY-----
-MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAtFax4nVzhPIqpAe6ABiN
-bOEvgTklM7X66HqI0g8QzUlI3Mk6CVdEhc0JTlXG1snwWBWIYhSzSE5Lo09GVSVH
-De2VUQv3fy2utiW5RQrCMcrAZTenW8/ariD2loHPafFkv5U8ZmcCmFnKpI6ur7tt
-ZJxhi0PfgrfDsmZOddCLxFGNPpbjMhU24LWfr/Crq+BCh4FPYI+oZ32lOdfzeTJV
-dlEKBFvhWBtLXFkJv6lUqhucBhNGZtEnIDDFKNhsH87ewPNxGZzgVFo/Rn2e+Y4b
-gwhj5d4Az+NiByAQPHwKX7UEYOYkmBVqOXzFgK0kSoq/gin1W76yrY/ekaSDoSKU
-wgvyzEvb4ljjWoh8PgCMScAR5rRfHx+0ssA/9b1s8xd1yVv3NlCZnb5bEIWVlOkh
-FHduSPTZ3iYyXiRb9QnoRSD8YXd6lhKa5HFBbEJ+cHHmMmPtfWe/rhXWYRpUg6Cc
-sx11hdmZyfpU7TFuD5S+e102SMrA/+A49f4SNxybQw6GSXgOSOoh/kDvTEa+KJDb
-72MozkASdcV+gLpY5cVRcuOSdRGs5FOl5HPABF57pX+c45CRi+VHZEClD4vhkPXn
-PdFMhASPRvh1joWFm5hChgvUekXNzmGDd7a1K3az0emWpv2mhfEq9DbBQ0f52yEL
-oUG2wgn5f+WhxU417rBQN08CAwEAAQ==
------END PUBLIC KEY-----
-PEM
+          -----BEGIN PUBLIC KEY-----
+          MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAtFax4nVzhPIqpAe6ABiN
+          bOEvgTklM7X66HqI0g8QzUlI3Mk6CVdEhc0JTlXG1snwWBWIYhSzSE5Lo09GVSVH
+          De2VUQv3fy2utiW5RQrCMcrAZTenW8/ariD2loHPafFkv5U8ZmcCmFnKpI6ur7tt
+          ZJxhi0PfgrfDsmZOddCLxFGNPpbjMhU24LWfr/Crq+BCh4FPYI+oZ32lOdfzeTJV
+          dlEKBFvhWBtLXFkJv6lUqhucBhNGZtEnIDDFKNhsH87ewPNxGZzgVFo/Rn2e+Y4b
+          gwhj5d4Az+NiByAQPHwKX7UEYOYkmBVqOXzFgK0kSoq/gin1W76yrY/ekaSDoSKU
+          wgvyzEvb4ljjWoh8PgCMScAR5rRfHx+0ssA/9b1s8xd1yVv3NlCZnb5bEIWVlOkh
+          FHduSPTZ3iYyXiRb9QnoRSD8YXd6lhKa5HFBbEJ+cHHmMmPtfWe/rhXWYRpUg6Cc
+          sx11hdmZyfpU7TFuD5S+e102SMrA/+A49f4SNxybQw6GSXgOSOoh/kDvTEa+KJDb
+          72MozkASdcV+gLpY5cVRcuOSdRGs5FOl5HPABF57pX+c45CRi+VHZEClD4vhkPXn
+          PdFMhASPRvh1joWFm5hChgvUekXNzmGDd7a1K3az0emWpv2mhfEq9DbBQ0f52yEL
+          oUG2wgn5f+WhxU417rBQN08CAwEAAQ==
+          -----END PUBLIC KEY-----
+          PEM
           mkdir -p out
           for a in handshake-deployer handshake-program handshake-rex; do
             f="$HOME/.config/rialo/$a.keypair"
