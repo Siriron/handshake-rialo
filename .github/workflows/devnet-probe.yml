@@ -1,28 +1,57 @@
-# UNTESTED first step toward deploying from GitHub. Installs the Rialo toolchain
-# on a Linux runner and prints the CLI help so the real deploy commands can be
-# written from the output. Run manually from the Actions tab.
+# Installs the Rialo toolchain on a Linux runner, prints what the CLI offers,
+# and publishes the output to the probe-results branch so the real deploy
+# commands can be written from facts. Run manually from the Actions tab.
 name: devnet-probe
 on: workflow_dispatch
+permissions:
+  contents: read
 jobs:
   probe:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # only to publish the probe output branch
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-wasip2
-      - name: Install rialoman
-        run: curl -fsSL https://rialo-artifacts.s3.us-east-2.amazonaws.com/rialoman/stable/install.sh | bash
-      - name: Install Rialo 0.18.1
+      - name: probe
+        shell: bash
+        continue-on-error: true
         run: |
-          export PATH="$HOME/.local/share/rialo/bin:$PATH"
+          set +e
+          exec > >(tee probe.log) 2>&1
+          echo "== uname"; uname -a
+          echo "== install rialoman (script head, then run)"
+          curl -fsSL https://rialo-artifacts.s3.us-east-2.amazonaws.com/rialoman/stable/install.sh -o install.sh
+          echo "curl exit $?"; head -c 1200 install.sh; echo
+          bash install.sh
+          export PATH="$HOME/.local/share/rialo/bin:$HOME/.rialo/bin:$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+          echo "== where did it land"; command -v rialoman rialo
+          find "$HOME" -maxdepth 4 \( -name 'rialo*' -o -name '.rialo*' \) -not -path '*/.cargo/registry/*' 2>/dev/null | head -20
+          echo "== rialoman"; rialoman --help
           rialoman install stable@0.18.1
-          rialo --version
-      - name: Print CLI surface
+          export PATH="$HOME/.local/share/rialo/bin:$HOME/.rialo/bin:$PATH"
+          echo "== rialo version"; rialo --version
+          echo "== rialo --help"; rialo --help
+          echo "== rialo client --help"; rialo client --help
+          echo "== rialo client program --help"; rialo client program --help
+          echo "== deploy-venus --help"; rialo client program deploy-venus --help
+          echo "== invoke --help"; rialo client program invoke --help
+          echo "== devnet reachability"
+          curl -s -m 10 -o /dev/null -w "devnet.rialo.io http=%{http_code}\n" https://devnet.rialo.io
+          curl -s -m 10 -X POST -H 'content-type: application/json' https://devnet.rialo.io -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}' | head -c 300; echo
+      - name: publish probe output
+        if: always()
+        shell: bash
         run: |
-          export PATH="$HOME/.local/share/rialo/bin:$PATH"
-          rialo --help
-          rialo client --help
-          rialo client program --help
-          rialo client program deploy-venus --help || true
-          rialo client program invoke --help || true
+          mkdir -p /tmp/report
+          {
+            echo "commit: $GITHUB_SHA"; echo "run: $GITHUB_RUN_ID"; echo "job-status: ${{ job.status }}"
+            echo; sed 's/\x1b\[[0-9;]*[A-Za-z]//g' probe.log | tail -n 700
+          } > /tmp/report/probe-result.txt
+          cd /tmp/report
+          git init -q; git checkout -q -b probe-results
+          git config user.name "github-actions"; git config user.email "actions@users.noreply.github.com"
+          git add probe-result.txt; git commit -q -m "probe output for $GITHUB_SHA"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" probe-results
