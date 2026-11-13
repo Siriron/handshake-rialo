@@ -1,0 +1,66 @@
+# One-time helper: generates the devnet deployer, program, and REX keypairs on
+# a runner, encrypts them to a public key whose private half is not in this
+# repo, and publishes only ciphertext plus public addresses to keys-results.
+name: gen-keys
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  keys:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # only to publish the ciphertext branch
+    steps:
+      - uses: dtolnay/rust-toolchain@stable
+      - name: generate and encrypt
+        shell: bash
+        continue-on-error: true
+        run: |
+          set +e
+          exec > >(tee keys.log) 2>&1
+          curl -fsSL https://rialo-artifacts.s3.us-east-2.amazonaws.com/rialoman/stable/install.sh -o install.sh
+          bash install.sh < /dev/null >/dev/null 2>&1
+          export PATH="$HOME/.local/share/rialo/bin:$PATH"
+          rialoman install stable@0.18.1 >/dev/null 2>&1 && rialoman use stable@0.18.1 >/dev/null 2>&1
+          export PATH="$(dirname "$(rialoman which rialo)"):$PATH"
+          echo "== attach help"; rialo keytool attach --help 2>&1 | grep -v '^\s*$' | head -14
+          for a in handshake-deployer handshake-program handshake-rex; do
+            rialo keytool generate $a --no-setup 2>&1 | sed 's/^Keypair created at: [^,]*, //'
+          done
+          cat > pub.pem <<'PEM'
+-----BEGIN PUBLIC KEY-----
+MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAtFax4nVzhPIqpAe6ABiN
+bOEvgTklM7X66HqI0g8QzUlI3Mk6CVdEhc0JTlXG1snwWBWIYhSzSE5Lo09GVSVH
+De2VUQv3fy2utiW5RQrCMcrAZTenW8/ariD2loHPafFkv5U8ZmcCmFnKpI6ur7tt
+ZJxhi0PfgrfDsmZOddCLxFGNPpbjMhU24LWfr/Crq+BCh4FPYI+oZ32lOdfzeTJV
+dlEKBFvhWBtLXFkJv6lUqhucBhNGZtEnIDDFKNhsH87ewPNxGZzgVFo/Rn2e+Y4b
+gwhj5d4Az+NiByAQPHwKX7UEYOYkmBVqOXzFgK0kSoq/gin1W76yrY/ekaSDoSKU
+wgvyzEvb4ljjWoh8PgCMScAR5rRfHx+0ssA/9b1s8xd1yVv3NlCZnb5bEIWVlOkh
+FHduSPTZ3iYyXiRb9QnoRSD8YXd6lhKa5HFBbEJ+cHHmMmPtfWe/rhXWYRpUg6Cc
+sx11hdmZyfpU7TFuD5S+e102SMrA/+A49f4SNxybQw6GSXgOSOoh/kDvTEa+KJDb
+72MozkASdcV+gLpY5cVRcuOSdRGs5FOl5HPABF57pX+c45CRi+VHZEClD4vhkPXn
+PdFMhASPRvh1joWFm5hChgvUekXNzmGDd7a1K3az0emWpv2mhfEq9DbBQ0f52yEL
+oUG2wgn5f+WhxU417rBQN08CAwEAAQ==
+-----END PUBLIC KEY-----
+PEM
+          mkdir -p out
+          for a in handshake-deployer handshake-program handshake-rex; do
+            f="$HOME/.config/rialo/$a.keypair"
+            echo "file $a: bytes=$(wc -c < "$f") first-char=$(head -c 1 "$f")"
+            openssl rand -hex 32 > k.txt
+            openssl enc -aes-256-cbc -pbkdf2 -salt -in "$f" -out "out/$a.enc" -pass file:k.txt
+            openssl pkeyutl -encrypt -pubin -inkey pub.pem -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 -in k.txt -out "out/$a.key.enc"
+          done
+          rm -f k.txt
+          echo "== config dir listing (names only)"; ls "$HOME/.config/rialo"
+      - name: publish ciphertext
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p /tmp/report && cd /tmp/report
+          sed 's/\x1b\[[0-9;]*[A-Za-z]//g' "$GITHUB_WORKSPACE/keys.log" | tail -n 80 > keys-result.txt
+          for f in "$GITHUB_WORKSPACE"/out/*.enc; do echo "$(basename $f) $(base64 -w0 $f)" >> ciphertext.txt; done
+          git init -q; git checkout -q -b keys-results
+          git config user.name "github-actions"; git config user.email "actions@users.noreply.github.com"
+          git add . ; git commit -q -m "key ciphertext for $GITHUB_SHA"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" keys-results
