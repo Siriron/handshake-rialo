@@ -1,0 +1,68 @@
+commit: 723e3b1ecc8667d1e9af39b70b11f313299c3c3e
+run: 43564589979
+job-status: success
+
+Keypair hs-deployer added.
+buyer:  G839F16yx2AyBcQvcX2NoVRmq3U8R5xAAfbn1ngdhDP6
+seller: H8vnW581MjUne4mMH6251Ra3HWqUHjaXqSP2412JmpXu
+== top up buyer to at least 1.5 RLO
+buyer balance: 3.02964792
+== generate manifest
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 29.37s
+slug: 1e706d4b8e2a4a65fb46a8d80ed36ede179517cf6c5454240685636192e2bf0c
+start: buyer=3.02964792 seller=0
+== create
+-- invoke --function create --rex-bytecode-account 7pycwurxgfQMaTN9KMbHqn8vCcBzgZhJKvB4epLyjpH3 --arg workflow_pda_slug=1e706d4b8e2a4a65fb46a8d80ed36ede179517cf6c5454240685636192e2bf0c --arg payee=H8vnW581MjUne4mMH6251Ra3HWqUHjaXqSP2412JmpXu
+Invoked create on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: FofBXdpaVzyLJTkKm9ut1hf8s4VfhofqaPrigKrQjWedb54ZvPoKzvpEDphF6pj73gv8NEKTtxAHMPi5ebuEEZe
+deadlines: D1=1794636479630 D2=1794636549630 (now 1794636379667)
+== add milestone 1 (release exists: expect PAID)
+-- invoke --function add_milestone --arg workflow_pda_slug=1e706d4b8e2a4a65fb46a8d80ed36ede179517cf6c5454240685636192e2bf0c --arg amount_kelvin=50000000 --arg deadline_ms=1794636479630 --arg kind=1 --arg target=Siriron/handshake-rialo@v0.1.0
+Invoked add_milestone on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: 5sRgWN8dSQrMHKkLAHXknbW93Gfgt1QnYHotHZLKKvT3miHVp3P6wCqTv1LwBKbW35PPqvfb2VjavWDJMgJvbTe5
+== add milestone 2 (tag absent: expect REFUNDED)
+-- invoke --function add_milestone --arg workflow_pda_slug=1e706d4b8e2a4a65fb46a8d80ed36ede179517cf6c5454240685636192e2bf0c --arg amount_kelvin=50000000 --arg deadline_ms=1794636549630 --arg kind=1 --arg target=Siriron/handshake-rialo@v9.9.9
+Invoked add_milestone on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: 5M3YVZjAc3XvkgUBoQkbutMxq2B6wwUCeY4XjVGVxhaQkMs7dTezYLKB3sPmaofTiPsBs9ECN8bdKo1Pup3See34
+== fund
+-- invoke --function fund --arg workflow_pda_slug=1e706d4b8e2a4a65fb46a8d80ed36ede179517cf6c5454240685636192e2bf0c
+Invoked fund on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: 2U795Q6Rx9bbukj5YjoFpjxFLFFdDH29cVjdnMFsT2zwYvEeQPC2iFJxDKFfPWzoUo4ua8TAuofu2rszEKrT2bF
+funded at 1794636379329; waiting for deadlines and checks
+t=06:06:19 buyer=3.02964792 seller=0
+t=06:06:44 buyer=2.9182544 seller=0
+t=06:07:09 buyer=2.9182544 seller=0
+t=06:07:34 buyer=2.9182544 seller=0
+t=06:08:03 buyer=2.9182544 seller=0
+t=06:08:32 buyer=2.90585168 seller=0.05
+t=06:09:01 buyer=2.90585168 seller=0.05
+t=06:09:30 buyer=2.94350464 seller=0.05
+t=06:09:55 buyer=2.94955288 seller=0.05
+t=06:10:20 buyer=2.94955288 seller=0.05
+t=06:10:46 buyer=2.94955288 seller=0.05
+t=06:11:11 buyer=2.94955288 seller=0.05
+t=06:11:38 buyer=2.94955288 seller=0.05
+== final
+buyer:  start=3.02964792 end=2.94955288
+seller: start=0 end=0.05  (expect +0.05 RLO)
+== program log lines from the last 100 transactions (chronological)
+20 recent.txt
+-- 3EmBkgaQA7... ok t=1794636488
+  8: Program log: handshake: milestone 0 is due, starting its check
+-- 4beC1Axc2F... ok t=1794636489
+  8: Program log: handshake check #1 for milestone 0
+-- HmBXwCKHJd... ok t=1794636490
+  8: Program log: handshake update 1: HS1|1|Siriron/handshake-rialo@v0.1.0|released
+  9: Program log: handshake update 2: HS1|1|Siriron/handshake-rialo@v0.1.0|released
+  10: Program log: handshake on_check milestone 0: 4 updates, verdict 1
+  11: Program log: handshake milestone 0 settled: 50000000 kelvin
+-- 3uF4J7EAaF... ok t=1794636558
+  8: Program log: handshake: milestone 1 is due, starting its check
+-- 5bpcpRm1XY... ok t=1794636559
+  8: Program log: handshake check #1 for milestone 1
+-- 5BqaPZAjH3... ok t=1794636560
+  8: Program log: handshake update 1: HS1|1|Siriron/handshake-rialo@v9.9.9|absent
+  9: Program log: handshake update 2: HS1|1|Siriron/handshake-rialo@v9.9.9|absent
+  10: Program log: handshake on_check milestone 1: 4 updates, verdict 2
+  11: Program log: handshake: validators agree milestone 1 was not met
+  12: Program log: handshake milestone 1 settled: 50000000 kelvin
