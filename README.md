@@ -27,32 +27,20 @@ token, or speculation.
 - `mock-endpoint/` demo status endpoint for kind 0 (Vercel function).
 
 ## Status
-- VERIFIED on a clean GitHub runner (see the `ci` workflow): `cargo test` passes for
-  `core` (17 tests); `cargo check` passes for the program and its generated REX
-  component (Venus 0.18.1).
-- NOT VERIFIED: PolkaVM and WASM artifact builds, deployment, and any runtime
-  behaviour on devnet. The `devnet-probe` workflow is the first step.
+- Deployed and exercised on Rialo devnet. A live two-milestone deal paid one
+  milestone and refunded the other with no manual step after funding. Signatures
+  and logs are in [`docs/EVIDENCE.md`](docs/EVIDENCE.md), including an earlier
+  run that did not settle and the list of paths not yet verified on chain.
+- `core` has 19 tests; CI runs them and type-checks the program on every push.
 - Not built yet: the frontend and the receipt page.
-
-## Toolchain pin (important)
-`rust-toolchain.toml` pins Rust 1.90.0. The REX verifier compiles to a WASI
-component whose imports depend on the Rust version, and a component built with
-current stable (1.100, WASI 0.2.12) fails to instantiate on DevNet validators.
-Do not bump the pin without a live devnet check.
 
 ## Run the tests
     cargo test --manifest-path core/Cargo.toml
     cargo check --manifest-path program/Cargo.toml
 
-## Deploying (planned; commands follow Merit's published DevNet evidence)
-Not yet run for this program, so treat every line as unconfirmed.
-
-    rialoman install stable@0.18.1          # also: rustup target add wasm32-wasip2
-    cargo build --manifest-path program/artifact/Cargo.toml
-    rialo client program deploy-venus program   # prints program id + REX bytecode account
-
-Then set `AUTHORIZED_REX` in `program/src/lib.rs` to the printed REX account
-(until then `create` fails closed), rebuild, and redeploy. Every call names the
-deal by a random 32-byte hex `workflow_pda_slug` and passes
-`--rex-bytecode-account`. Kind 0 also needs your endpoint URL set in the REX
-function. DevNet timers expire after about 15 s, so every timer here is under 11 s.
+## Deploying
+The `deploy-devnet` and `test-devnet` workflows reproduce the deployment and the
+live test deal from a Linux runner using the Rialo 0.18.1 toolchain. They need
+three repository secrets holding devnet keypairs (deployer, program, REX); the
+REX key's address is pinned as `AUTHORIZED_REX` in `program/src/lib.rs`. DevNet
+timers expire after about 15 s, so every timer here is under 11 s.
