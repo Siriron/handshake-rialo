@@ -1,0 +1,27 @@
+commit: 723e3b1ecc8667d1e9af39b70b11f313299c3c3e
+run: 43563914380
+job-status: success
+
+rialo 0.18.1-2e1fdefe31cc
+== addresses (expected: deployer G839F16y..., program 5umz6vh9..., rex 7pycwurx...)
+deployer: G839F16yx2AyBcQvcX2NoVRmq3U8R5xAAfbn1ngdhDP6
+program: 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+rex: 7pycwurxgfQMaTN9KMbHqn8vCcBzgZhJKvB4epLyjpH3
+Keypair hs-deployer added.
+== fund the deployer to at least 3 RLO
+balance: 3.13170872 RLO
+rustc in repo: rustc 1.90.0 (1159e78c4 2025-09-14)
+== generate WIT and manifest
+Generated Venus manifest: /home/runner/work/handshake-rialo/handshake-rialo/program/wit/handshake-manifest.json
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 19.71s
+== build artifact
+warning: handshake-artifact@0.1.0:   Component: /home/runner/work/handshake-rialo/handshake-rialo/program/artifact/../target/rex-wasm-components/__rex_component_verify/target/wasm32-wasip2/release/__rex_component_verify.wasm (100899 bytes)
+warning: handshake-artifact@0.1.0: ✅ Packed 1 rex WASM components (100943 bytes)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 36s
+== deploy-venus
+Venus program deployed at 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+REX components deployed at 7pycwurxgfQMaTN9KMbHqn8vCcBzgZhJKvB4epLyjpH3
+
+Pass __rex_bytecode_account = 7pycwurxgfQMaTN9KMbHqn8vCcBzgZhJKvB4epLyjpH3 when invoking the Venus handler.
+== balance after deploy
+3.09739592 RLO
