@@ -50,6 +50,7 @@ jobs:
             rialo -n devnet -a hs-deployer client airdrop --amount 1 --no-setup 2>&1 | tail -2
             sleep 3
           done
+          echo "rustc in repo: $(rustc --version)"
           echo "== generate WIT and manifest"
           cargo check --manifest-path program/Cargo.toml 2>&1 | tail -2
           echo "== build artifact"
