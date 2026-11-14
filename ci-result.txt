@@ -1,0 +1,76 @@
+commit: c452a5fb1dc4bca82468857d315087f5349bca02
+run: 43565622539
+job-status: success
+
+--- core tests (tail)
+info: syncing channel updates for 1.90.0-x86_64-unknown-linux-gnu
+info: latest update on 2025-09-18 for version 1.90.0 (1159e78c4 2025-09-14)
+info: downloading 4 components
+warn: the missing active toolchain `1.90.0-x86_64-unknown-linux-gnu` has been auto-installed
+warn: this might cause rustup commands to take longer time to finish than expected
+info: you may opt out with `RUSTUP_AUTO_INSTALL=0` or `rustup set auto-install disable`
+[1m[32m   Compiling[0m handshake-core v0.1.0 (/home/runner/work/handshake-rialo/handshake-rialo/core)
+[1m[32m    Finished[0m `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+[1m[32m     Running[0m unittests src/lib.rs (core/target/debug/deps/handshake_core-08e0cc1cc6dea595)
+
+running 19 tests
+test tests::a_stuck_check_always_ends_in_a_refund ... ok
+test tests::github_pr_targets ... ok
+test tests::github_release_targets ... ok
+test tests::heartbeat_stops_only_when_nothing_is_open ... ok
+test tests::kind_routes_to_the_right_validator ... ok
+test tests::minimum_report_count ... ok
+test tests::next_due_picks_the_first_due_milestone_and_never_overlaps ... ok
+test tests::one_dissenter_or_failure_blocks_the_report ... ok
+test tests::order_ids ... ok
+test tests::oversize_and_non_utf8_payloads_are_rejected ... ok
+test tests::payload_must_bind_to_this_exact_milestone ... ok
+test tests::retry_policy ... ok
+test tests::schedule_rules ... ok
+test tests::settle_pays_and_refunds_once ... ok
+test tests::settle_rejects_bad_state_and_index ... ok
+test tests::stuck_check_detection ... ok
+test tests::total_detects_overflow ... ok
+test tests::unanimous_met_and_not_met ... ok
+test tests::conservation_under_random_sequences ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+[1m[32m   Doc-tests[0m handshake_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+--- program check (tail)
+[1m[32m    Checking[0m static_assertions v1.1.0
+[1m[32m   Compiling[0m prettyplease v0.2.37
+[1m[32m    Checking[0m rialo-types v0.18.1
+[1m[32m    Checking[0m rialo-events-core v0.18.1
+[1m[32m   Compiling[0m rustix v1.1.6
+[1m[32m   Compiling[0m linux-raw-sys v0.12.1
+[1m[32m   Compiling[0m rialo-syngen-dsl v0.18.1
+[1m[32m   Compiling[0m toml_datetime v0.7.5+spec-1.1.0
+[1m[32m   Compiling[0m serde_spanned v1.1.3
+[1m[32m    Checking[0m rialo-rex-processor-interface v0.18.1
+[1m[32m    Checking[0m strum v0.24.1
+[1m[32m    Checking[0m rialo-validator-registry-interface v0.18.1
+[1m[32m   Compiling[0m winnow v0.7.15
+[1m[32m   Compiling[0m toml_writer v1.2.0+spec-1.1.0
+[1m[32m   Compiling[0m rialo-syngen-proc-macro v0.18.1
+[1m[32m   Compiling[0m fs4 v1.1.0
+[1m[32m    Checking[0m rialo-websocket-registry-interface v0.18.1
+[1m[32m    Checking[0m rialo-rex-registry-interface v0.18.1
+[1m[32m    Checking[0m rialo-subscriber-interface v0.18.1
+[1m[32m   Compiling[0m toml v0.9.12+spec-1.1.0
+[1m[32m    Checking[0m rialo-s-compute-budget-interface v0.18.1
+[1m[32m    Checking[0m handshake-core v0.1.0 (/home/runner/work/handshake-rialo/handshake-rialo/core)
+[1m[32m    Checking[0m rialo-venus v0.18.1
+[1m[32m   Compiling[0m rialo-venus-dsl v0.18.1
+[1m[32m   Compiling[0m rialo-venus-proc-macro v0.18.1
+[1m[32m    Checking[0m handshake v0.1.0 (/home/runner/work/handshake-rialo/handshake-rialo/program)
+Generated 1 rex WASM component crate(s) in /home/runner/work/handshake-rialo/handshake-rialo/program/target/rex-wasm-components (WIT from embedded copy)
+Generated WIT file: /home/runner/work/handshake-rialo/handshake-rialo/program/wit/handshake.wit
+Generated Venus manifest: /home/runner/work/handshake-rialo/handshake-rialo/program/wit/handshake-manifest.json
+[1m[32m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 17.99s
