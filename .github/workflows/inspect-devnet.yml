@@ -1,15 +1,19 @@
-# Lists recent transactions that touched the deployed Handshake program and
-# prints their status and program log lines. Output goes to inspect-results.
+# Walks back through the transactions of an address until a given signature and
+# prints status and program logs for the earliest ones after it. Output goes to
+# the inspect-results branch.
 name: inspect-devnet
 on:
   workflow_dispatch:
     inputs:
-      since:
-        description: "Only transactions at or after this Unix time (seconds)"
-        default: "0"
       address:
-        description: "Address whose transactions to list (default: the program)"
-        default: "5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h"
+        description: "Address whose transactions to list"
+        default: "G839F16yx2AyBcQvcX2NoVRmq3U8R5xAAfbn1ngdhDP6"
+      after:
+        description: "Signature to start after (stop paging when reached)"
+        default: "3jt8csAhoFYedpvH1kUyoSxQuyFRKagJTXocWK3BfzKjxv5H5QnA8YovQHAWVhFDiHvTRvGqvSXxx2mSX7uV3foo"
+      count:
+        description: "How many transactions after it to detail"
+        default: "70"
 permissions:
   contents: read
 jobs:
@@ -22,45 +26,65 @@ jobs:
         shell: bash
         continue-on-error: true
         env:
-          SINCE: ${{ github.event.inputs.since }}
           ADDRESS: ${{ github.event.inputs.address }}
+          AFTER: ${{ github.event.inputs.after }}
+          COUNT: ${{ github.event.inputs.count }}
         run: |
           set +e
           exec > >(tee inspect.log) 2>&1
-          PROGRAM="${ADDRESS:-5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h}"
           curl -fsSL https://rialo-artifacts.s3.us-east-2.amazonaws.com/rialoman/stable/install.sh -o install.sh
           bash install.sh < /dev/null > /dev/null 2>&1
           export PATH="$HOME/.local/share/rialo/bin:$PATH"
           rialoman install stable@0.18.1 > /dev/null 2>&1; rialoman use stable@0.18.1 > /dev/null 2>&1
           export PATH="$(dirname "$(rialoman which rialo)"):$PATH"
-          curl -s -m 30 -X POST -H 'content-type: application/json' https://devnet.rialo.io \
-            -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getSignaturesForAddress\",\"params\":[{\"address\":\"$PROGRAM\",\"limit\":100}]}" > sigs.json
-          python3 - <<'PY' > sigs.txt
-          import json, os
-          since = int(os.environ.get("SINCE") or 0)
-          d = json.load(open("sigs.json"))
-          rows = (d.get("result") or {}).get("value") or []
-          if not rows:
-              print("NO-RESULT", json.dumps(d)[:300])
-          for r in rows:
-              bt = r.get("blockTime") or 0
-              if bt > 10**11:
-                  bt //= 1000
-              if bt >= since:
-                  print(r["signature"], "ERR" if r.get("err") else "ok", bt, json.dumps(r.get("err"))[:120] if r.get("err") else "")
+          python3 - <<'PY'
+          import json, os, urllib.request
+          addr, after, count = os.environ["ADDRESS"], os.environ["AFTER"], int(os.environ.get("COUNT") or 70)
+          def rpc(params):
+              body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "getSignaturesForAddress", "params": [params]}).encode()
+              req = urllib.request.Request("https://devnet.rialo.io", data=body, headers={"content-type": "application/json"})
+              return json.load(urllib.request.urlopen(req, timeout=40))["result"]["value"]
+          sigs, before, pages = [], None, 0
+          while pages < 120:
+              p = {"address": addr, "limit": 100}
+              if before:
+                  p["before"] = before
+              rows = rpc(p); pages += 1
+              if not rows:
+                  break
+              hit = False
+              for r in rows:
+                  if r["signature"] == after:
+                      hit = True
+                      break
+                  sigs.append(r)
+              if hit or len(rows) < 100:
+                  print("paging stopped: reached-after=%s pages=%d" % (hit, pages))
+                  break
+              before = rows[-1]["signature"]
+          print("transactions newer than the anchor:", len(sigs))
+          chrono = list(reversed(sigs))[:count]
+          with open("chrono.txt", "w") as f:
+              for r in chrono:
+                  bt = r.get("blockTime") or 0
+                  bt = bt // 1000 if bt > 10**11 else bt
+                  f.write("%s %s %s\n" % (r["signature"], "ERR" if r.get("err") else "ok", bt))
           PY
-          echo "== signatures touching the program (since $SINCE)"; cat sigs.txt | cut -c1-150
-          echo "== per-transaction detail"
-          grep -v NO-RESULT sigs.txt | awk '{print $1" "$2}' | head -45 | while read sig st; do
-            echo "-- ${sig:0:10}... $st"
-            rialo -n devnet client transaction "$sig" --no-setup 2>&1 | grep -v '^\s*$' | head -16 | cut -c1-210
-          done
+          echo "== earliest transactions after the anchor (chronological)"
+          i=0
+          while read sig st bt; do
+            i=$((i+1))
+            echo "-- #$i ${sig:0:10}... $st t=$bt"
+            rialo -n devnet client transaction "$sig" --no-setup 2>&1 \
+              | grep -E 'Status:|handshake|rror|ail|Instruction|Program log' \
+              | grep -v -E 'branch number|Continue workflow|ComputeBudget' | head -8 | cut -c1-200
+          done < chrono.txt
       - name: publish output
         if: always()
         shell: bash
         run: |
           mkdir -p /tmp/report
-          { echo "run: $GITHUB_RUN_ID"; sed 's/\x1b\[[0-9;]*[A-Za-z]//g' inspect.log | tail -n 330; } > /tmp/report/inspect-result.txt
+          { echo "run: $GITHUB_RUN_ID"; sed 's/\x1b\[[0-9;]*[A-Za-z]//g' inspect.log | head -n 400; } > /tmp/report/inspect-result.txt
           cd /tmp/report
           git init -q; git checkout -q -b inspect-results
           git config user.name "github-actions"; git config user.email "actions@users.noreply.github.com"
