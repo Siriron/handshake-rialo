@@ -6,7 +6,7 @@ Everything below is on Rialo devnet and can be checked independently.
 | --- | --- |
 | Program | `5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h` |
 | REX verifier | `7pycwurxgfQMaTN9KMbHqn8vCcBzgZhJKvB4epLyjpH3` |
-| Toolchain | Rialo 0.18.1, Venus 0.18.1 |
+| Toolchain | Rialo 0.18.1, Venus 0.18.1, Rust 1.90.0 (pinned in `rust-toolchain.toml`) |
 | Deployed by | the `deploy-devnet` workflow, from persistent keys held as repository secrets |
 
 Check any signature with `rialo -n devnet client transaction <signature>`, or
@@ -45,13 +45,20 @@ REX requests and both settlements ran from timers and validator reports.
 
 ## An earlier run that did not settle (kept for honesty)
 An earlier test deal with the same two milestones got four validator updates for
-every check but every verdict was inconclusive, so the retry policy refunded
-both milestones and the seller was never paid. The cause was not observed at
-the time. GitHub's unauthenticated API rate limit is the leading suspect and is
-unconfirmed. Since then the verifier reports HTTP failures as visible payloads
-(`HS1|<kind>|<target>|http-<status>`) so any future occurrence is diagnosable.
-Treat intermittent inconclusive checks as a real operating risk: they refund the
-buyer rather than pay the seller.
+every check, but every verdict was inconclusive, so the retry policy refunded
+both milestones and the seller was never paid. The cause was a toolchain
+mismatch, not the contract logic: the REX verifier compiles to a WASI component,
+and built with Rust 1.100 it imports `wasi:cli/exit@0.2.12`, which the DevNet
+validators could not instantiate (the validator error is quoted in
+`rust-toolchain.toml`). Building with Rust 1.90.0 imports WASI 0.2.3 and the
+live deal above then settled correctly. The probe output that compared Rust
+versions is on the `wasi-results` branch.
+
+Two lessons recorded here: bumping the Rust pin can silently break every check,
+so it needs a live devnet test; and a check that fails this way refunds the
+buyer rather than paying the seller. The verifier also now reports HTTP failures
+as visible payloads (`HS1|<kind>|<target>|http-<status>`), so other failures are
+diagnosable from the transaction logs.
 
 ## Not yet verified on devnet
 - Pull-request verifier (kind 2) and status-endpoint verifier (kind 0).

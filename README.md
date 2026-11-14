@@ -34,6 +34,12 @@ token, or speculation.
 - `core` has 19 tests; CI runs them and type-checks the program on every push.
 - Not built yet: the frontend and the receipt page.
 
+## Toolchain pin (important)
+`rust-toolchain.toml` pins Rust 1.90.0. The REX verifier compiles to a WASI
+component whose imports depend on the Rust version, and a component built with
+current stable (1.100, WASI 0.2.12) fails to instantiate on DevNet validators.
+Do not bump the pin without a live devnet check.
+
 ## Run the tests
     cargo test --manifest-path core/Cargo.toml
     cargo check --manifest-path program/Cargo.toml
