@@ -3,7 +3,12 @@
 # that does not exist (expect: refunded). Output (never keys) goes to the
 # test-results branch. Run manually from the Actions tab.
 name: test-devnet
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "full (two milestones) or quick (one milestone, about 3 minutes)"
+        default: "full"
 permissions:
   contents: read
 jobs:
@@ -13,6 +18,7 @@ jobs:
       contents: write   # only to publish the output branch
     env:
       DEPLOYER_B64: ${{ secrets.HS_DEPLOYER_KEYPAIR }}
+      MODE: ${{ github.event.inputs.mode }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -56,12 +62,15 @@ jobs:
           echo "deadlines: D1=$D1 D2=$D2 (now $(date +%s%3N))"
           echo "== add milestone 1 (release exists: expect PAID)"
           inv --function add_milestone --arg workflow_pda_slug="$SLUG" --arg amount_kelvin=50000000 --arg deadline_ms=$D1 --arg kind=1 --arg target='Siriron/handshake-rialo@v0.1.0'
+          if [ "$MODE" != "quick" ]; then
           echo "== add milestone 2 (tag absent: expect REFUNDED)"
           inv --function add_milestone --arg workflow_pda_slug="$SLUG" --arg amount_kelvin=50000000 --arg deadline_ms=$D2 --arg kind=1 --arg target='Siriron/handshake-rialo@v9.9.9'
+          fi
           echo "== fund"
           inv --function fund --arg workflow_pda_slug="$SLUG"
           echo "funded at $(date +%s%3N); waiting for deadlines and checks"
           END=$(( D2 + 150000 ))
+          if [ "$MODE" = "quick" ]; then END=$(( D1 + 110000 )); fi
           while [ "$(date +%s%3N)" -lt "$END" ]; do
             echo "t=$(date +%H:%M:%S) buyer=$(bal "$BUYER") seller=$(bal "$SELLER")"
             sleep 25

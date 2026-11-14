@@ -413,6 +413,7 @@ rialo! {
                     n += 1;
                     let mut item: Option<Vec<u8>> = None;
                     if let Ok(output) = update.try_data_as_output() {
+                        let described = if n <= 2 { format!("{:?}", output) } else { String::new() };
                         if let RexOutput::Success(response) = output {
                             if let RexData::Raw(payload) = response.response {
                                 if n <= 2 {
@@ -424,7 +425,8 @@ rialo! {
                                 msg!("handshake update {}: success but not raw data", n);
                             }
                         } else if n <= 2 {
-                            msg!("handshake update {}: not a success output", n);
+                            let short: String = described.chars().take(300).collect();
+                            msg!("handshake update {}: not a success output: {}", n, short);
                         }
                     } else if n <= 2 {
                         msg!("handshake update {}: undecodable output", n);
