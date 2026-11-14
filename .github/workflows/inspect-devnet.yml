@@ -45,7 +45,7 @@ jobs:
               req = urllib.request.Request("https://devnet.rialo.io", data=body, headers={"content-type": "application/json"})
               return json.load(urllib.request.urlopen(req, timeout=40))["result"]["value"]
           sigs, before, pages = [], None, 0
-          while pages < 120:
+          while pages < 600:
               p = {"address": addr, "limit": 100}
               if before:
                   p["before"] = before
@@ -58,7 +58,7 @@ jobs:
                       hit = True
                       break
                   sigs.append(r)
-              if hit or len(rows) < 100:
+              if hit:
                   print("paging stopped: reached-after=%s pages=%d" % (hit, pages))
                   break
               before = rows[-1]["signature"]
