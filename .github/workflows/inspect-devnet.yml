@@ -30,12 +30,12 @@ jobs:
           rialoman install stable@0.18.1 > /dev/null 2>&1; rialoman use stable@0.18.1 > /dev/null 2>&1
           export PATH="$(dirname "$(rialoman which rialo)"):$PATH"
           curl -s -m 30 -X POST -H 'content-type: application/json' https://devnet.rialo.io \
-            -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getSignaturesForAddress\",\"params\":[\"$PROGRAM\",{\"limit\":80}]}" > sigs.json
+            -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getSignaturesForAddress\",\"params\":[{\"address\":\"$PROGRAM\",\"limit\":100}]}" > sigs.json
           python3 - <<'PY' > sigs.txt
           import json, os
           since = int(os.environ.get("SINCE") or 0)
           d = json.load(open("sigs.json"))
-          rows = d.get("result") or []
+          rows = (d.get("result") or {}).get("value") or []
           if not rows:
               print("NO-RESULT", json.dumps(d)[:300])
           for r in rows:
@@ -49,7 +49,7 @@ jobs:
           echo "== per-transaction detail"
           grep -v NO-RESULT sigs.txt | awk '{print $1" "$2}' | head -45 | while read sig st; do
             echo "-- ${sig:0:10}... $st"
-            rialo -n devnet client transaction "$sig" --no-setup 2>&1 | grep -i -E "handshake|error|fail|custom|invalid|insufficient|status|log" | head -9 | cut -c1-200
+            rialo -n devnet client transaction "$sig" --no-setup 2>&1 | grep -i -E "Status:|handshake|error|fail|custom|invalid|insufficient" | head -9 | cut -c1-200
           done
       - name: publish output
         if: always()
