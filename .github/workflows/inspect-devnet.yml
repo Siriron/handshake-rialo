@@ -7,6 +7,9 @@ on:
       since:
         description: "Only transactions at or after this Unix time (seconds)"
         default: "0"
+      address:
+        description: "Address whose transactions to list (default: the program)"
+        default: "5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h"
 permissions:
   contents: read
 jobs:
@@ -20,10 +23,11 @@ jobs:
         continue-on-error: true
         env:
           SINCE: ${{ github.event.inputs.since }}
+          ADDRESS: ${{ github.event.inputs.address }}
         run: |
           set +e
           exec > >(tee inspect.log) 2>&1
-          PROGRAM=5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+          PROGRAM="${ADDRESS:-5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h}"
           curl -fsSL https://rialo-artifacts.s3.us-east-2.amazonaws.com/rialoman/stable/install.sh -o install.sh
           bash install.sh < /dev/null > /dev/null 2>&1
           export PATH="$HOME/.local/share/rialo/bin:$PATH"
@@ -49,7 +53,7 @@ jobs:
           echo "== per-transaction detail"
           grep -v NO-RESULT sigs.txt | awk '{print $1" "$2}' | head -45 | while read sig st; do
             echo "-- ${sig:0:10}... $st"
-            rialo -n devnet client transaction "$sig" --no-setup 2>&1 | grep -i -E "Status:|handshake|error|fail|custom|invalid|insufficient" | head -9 | cut -c1-200
+            rialo -n devnet client transaction "$sig" --no-setup 2>&1 | grep -v '^\s*$' | head -16 | cut -c1-210
           done
       - name: publish output
         if: always()
