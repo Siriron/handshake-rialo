@@ -86,7 +86,7 @@ rialo! {
                         let name = body.get("tag_name").and_then(Value::as_str).unwrap_or("");
                         state = if !draft && name == tag { "released" } else { "absent" }.to_string();
                     } else {
-                        return Err(format!("HTTP {}", response.status));
+                        state = format!("http-{}", response.status);
                     }
                 } else if kind == "2" {
                     // owner/repo#number
@@ -101,7 +101,7 @@ rialo! {
                     let response = http::get(&url, &headers, 10_000)
                         .map_err(|error| format!("request failed: {}", error))?;
                     if response.status != 200 {
-                        return Err(format!("HTTP {}", response.status));
+                        return Ok(format!("HS1|{}|{}|http-{}", kind, target, response.status));
                     }
                     let body = serde_json::from_slice::<Value>(&response.body)
                         .map_err(|_| "invalid JSON".to_string())?;
@@ -117,7 +117,7 @@ rialo! {
                     let response = http::get(&url, &headers, 10_000)
                         .map_err(|error| format!("request failed: {}", error))?;
                     if response.status != 200 {
-                        return Err(format!("HTTP {}", response.status));
+                        return Ok(format!("HS1|{}|{}|http-{}", kind, target, response.status));
                     }
                     let body = serde_json::from_slice::<Value>(&response.body)
                         .map_err(|_| "invalid JSON".to_string())?;
@@ -408,14 +408,26 @@ rialo! {
             // make a report look unanimous.
             fn verdict(&self, report: &RexReport, i: usize) -> u64 {
                 let mut outputs: Vec<Option<Vec<u8>>> = Vec::new();
+                let mut n = 0usize;
                 for update in &report.updates {
+                    n += 1;
                     let mut item: Option<Vec<u8>> = None;
                     if let Ok(output) = update.try_data_as_output() {
                         if let RexOutput::Success(response) = output {
                             if let RexData::Raw(payload) = response.response {
+                                if n <= 2 {
+                                    let end = payload.len().min(120);
+                                    msg!("handshake update {}: {}", n, String::from_utf8_lossy(&payload[..end]));
+                                }
                                 item = Some(payload);
+                            } else if n <= 2 {
+                                msg!("handshake update {}: success but not raw data", n);
                             }
+                        } else if n <= 2 {
+                            msg!("handshake update {}: not a success output", n);
                         }
+                    } else if n <= 2 {
+                        msg!("handshake update {}: undecodable output", n);
                     }
                     outputs.push(item);
                 }
