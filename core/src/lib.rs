@@ -11,6 +11,8 @@ pub const MAX_WINDOW_MS: u64 = 86_400_000;
 /// verification windows never overlap.
 pub const MIN_GAP_MS: u64 = 30_000;
 pub const MAX_CHECKS: u64 = 3;
+/// A check with no usable report after this long is treated as inconclusive.
+pub const CHECK_TIMEOUT_MS: u64 = 45_000;
 pub const MIN_REPORTS: usize = 3;
 pub const MAX_PAYLOAD: usize = 128;
 pub const TARGET_WIDTH: usize = 64;
@@ -236,6 +238,19 @@ pub fn next_due(
         return None;
     }
     (0..count.min(MAX_MILESTONES)).find(|i| status[*i] == phase::FUNDED && now_ms >= deadlines[*i])
+}
+
+/// A milestone whose check started more than `CHECK_TIMEOUT_MS` ago and is
+/// still waiting. Lets the heartbeat rescue a check whose report never arrived.
+pub fn stuck_check(
+    status: &[u64; MAX_MILESTONES],
+    started: &[u64; MAX_MILESTONES],
+    count: usize,
+    now_ms: u64,
+) -> Option<usize> {
+    (0..count.min(MAX_MILESTONES)).find(|i| {
+        status[*i] == phase::CHECKING && now_ms.saturating_sub(started[*i]) > CHECK_TIMEOUT_MS
+    })
 }
 
 /// True while any milestone is still open, so the heartbeat must keep going.

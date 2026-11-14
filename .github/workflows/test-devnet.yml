@@ -69,8 +69,35 @@ jobs:
           echo "== final"
           echo "buyer:  start=$BUYER_START end=$(bal "$BUYER")"
           echo "seller: start=$SELLER_START end=$(bal "$SELLER")  (expect +0.05 RLO)"
-          echo "== recent transactions"
-          rialo -n devnet -a hs-deployer client get-transactions --no-setup 2>&1 | tail -40
+          echo "== program log lines from the last 100 transactions (chronological)"
+          python3 - <<'PY' > recent.txt
+          import json, urllib.request
+          rows, before = [], None
+          for _ in range(5):
+              p = {"address": "5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h", "limit": 20}
+              if before:
+                  p["before"] = before
+              body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "getSignaturesForAddress", "params": [p]}).encode()
+              req = urllib.request.Request("https://devnet.rialo.io", data=body, headers={"content-type": "application/json"})
+              page = json.load(urllib.request.urlopen(req, timeout=40))["result"]["value"]
+              if not page:
+                  break
+              rows += page
+              before = page[-1]["signature"]
+          seen = set()
+          for r in reversed(rows):
+              if r["signature"] in seen:
+                  continue
+              seen.add(r["signature"])
+              bt = r.get("blockTime") or 0
+              bt = bt // 1000 if bt > 10**11 else bt
+              print(r["signature"], "ERR" if r.get("err") else "ok", bt)
+          PY
+          wc -l recent.txt
+          while read sig st t; do
+            L="$(rialo -n devnet client transaction "$sig" --no-setup 2>&1 | grep -E 'handshake|rror|ail' | grep -v -E 'branch number|Continue workflow' | head -6 | cut -c1-200)"
+            if [ -n "$L" ] || [ "$st" = "ERR" ]; then echo "-- ${sig:0:10}... $st t=$t"; echo "$L"; fi
+          done < recent.txt
       - name: publish output
         if: always()
         shell: bash

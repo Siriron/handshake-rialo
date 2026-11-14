@@ -46,6 +46,7 @@ rialo! {
             checks: [u64; 4],
             targets: [String; 4],
             report_pda: Pubkey,
+            started: [u64; 4],
         }
 
         rex {
@@ -161,6 +162,7 @@ rialo! {
                 self.count = 0;
                 self.remaining = 0;
                 self.report_pda = Pubkey::default();
+                self.started = [0u64; 4];
                 for i in 0..4 {
                     self.amounts[i] = 0;
                     self.deadlines[i] = 0;
@@ -258,9 +260,23 @@ rialo! {
                     return Ok(()); // everything settled: the heartbeat ends here
                 }
                 let now = self.now_ms()?;
-                if let Some(due) = handshake_core::next_due(&self.status, &self.deadlines, count, now) {
+                // Rescue a check whose report never arrived: retry, then refund.
+                if let Some(stuck) = handshake_core::stuck_check(&self.status, &self.started, count, now) {
+                    let index = stuck as u64;
+                    let target = now.saturating_add(1_000);
+                    self.started[stuck] = now; // do not re-trigger on the next tick
+                    if handshake_core::should_retry(self.checks[stuck]) {
+                        msg!("handshake: check {} timed out, retrying", index);
+                        AFTER target CALL [run_check buyer: buyer payee: payee index: index];
+                    } else {
+                        msg!("handshake: check {} timed out for good, refunding", index);
+                        AFTER target CALL [expire_check buyer: buyer payee: payee index: index];
+                    }
+                } else if let Some(due) = handshake_core::next_due(&self.status, &self.deadlines, count, now) {
                     self.status[due] = handshake_core::phase::CHECKING;
+                    self.started[due] = now;
                     let index = due as u64;
+                    msg!("handshake: milestone {} is due, starting its check", index);
                     let target = now.saturating_add(1_000);
                     AFTER target CALL [run_check buyer: buyer payee: payee index: index];
                 }
@@ -289,6 +305,7 @@ rialo! {
                 );
                 self.report_pda = derive_report_address(self.payer_account().key, rex_nonce).0;
                 self.checks[i] = self.checks[i].saturating_add(1);
+                self.started[i] = self.now_ms()?;
                 let kind_tag = self.kinds[i].to_string();
                 let target_text = self.targets[i].trim_end_matches('\0').to_string();
                 msg!("handshake check #{} for milestone {}", self.checks[i], index);
@@ -327,6 +344,7 @@ rialo! {
                     return Err(ProgramError::InvalidAccountData);
                 }
                 let verdict = self.verdict(&report, i);
+                msg!("handshake on_check milestone {}: {} updates, verdict {}", index, report.updates.len(), verdict);
                 if verdict == handshake_core::VERDICT_MET {
                     return self.finish(i, handshake_core::Outcome::Pay);
                 }
@@ -341,6 +359,26 @@ rialo! {
                 let target = self.now_ms()?.saturating_add(crate::RETRY_MS);
                 AFTER target CALL [run_check buyer: buyer payee: payee index: index];
                 Ok(())
+            }
+
+            // Final fallback for a check that never produced a usable report:
+            // refund this milestone to the buyer.
+            handler fn expire_check(
+                &mut self,
+                buyer: Pubkey,
+                payee: Pubkey,
+                index: u64,
+            ) -> ProgramResult {
+                let _ = WriteAccountInfo::from(buyer);
+                let _ = WriteAccountInfo::from(payee);
+                let i = index as usize;
+                if i >= 4 || self.status[i] != handshake_core::phase::CHECKING {
+                    return Ok(());
+                }
+                if buyer != self.owner || payee != self.payee {
+                    return Err(ProgramError::InvalidArgument);
+                }
+                self.finish(i, handshake_core::Outcome::Refund)
             }
 
             handler fn approved_payout(

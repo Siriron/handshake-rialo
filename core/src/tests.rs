@@ -275,3 +275,38 @@ fn retry_policy() {
     assert!(should_retry(MAX_CHECKS - 1));
     assert!(!should_retry(MAX_CHECKS));
 }
+
+#[test]
+fn stuck_check_detection() {
+    let started = [1_000, 0, 0, 0];
+    let mut status = [phase::CHECKING, phase::FUNDED, phase::FUNDED, phase::FUNDED];
+    // not stuck until strictly past the timeout
+    assert_eq!(stuck_check(&status, &started, 4, 1_000 + CHECK_TIMEOUT_MS), None);
+    assert_eq!(stuck_check(&status, &started, 4, 1_000 + CHECK_TIMEOUT_MS + 1), Some(0));
+    // only CHECKING milestones can be stuck
+    status[0] = phase::PAID;
+    assert_eq!(stuck_check(&status, &started, 4, u64::MAX), None);
+    // milestones beyond `count` are ignored
+    let status = [phase::FUNDED, phase::CHECKING, phase::FUNDED, phase::FUNDED];
+    let started = [0, 5, 0, 0];
+    assert_eq!(stuck_check(&status, &started, 1, u64::MAX), None);
+    assert_eq!(stuck_check(&status, &started, 2, 5 + CHECK_TIMEOUT_MS + 1), Some(1));
+    // a clock that runs backwards never marks a check stuck
+    assert_eq!(stuck_check(&status, &started, 2, 0), None);
+}
+
+#[test]
+fn a_stuck_check_always_ends_in_a_refund() {
+    // simulate: checks time out repeatedly; after MAX_CHECKS attempts the
+    // milestone must be refundable and the heartbeat must be able to stop
+    let amounts = [10, 0, 0, 0];
+    let mut status = [phase::CHECKING, 0, 0, 0];
+    let mut remaining = 10;
+    let mut checks = 1u64;
+    while should_retry(checks) {
+        checks += 1; // retried after a timeout
+    }
+    assert_eq!(checks, MAX_CHECKS);
+    assert_eq!(settle(&mut status, &amounts, &mut remaining, 0, Outcome::Refund), Ok(10));
+    assert!(!any_open(&status, 1));
+}
