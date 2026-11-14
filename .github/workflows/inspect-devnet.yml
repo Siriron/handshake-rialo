@@ -1,0 +1,64 @@
+# Lists recent transactions that touched the deployed Handshake program and
+# prints their status and program log lines. Output goes to inspect-results.
+name: inspect-devnet
+on:
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "Only transactions at or after this Unix time (seconds)"
+        default: "0"
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # only to publish the output branch
+    steps:
+      - name: inspect
+        shell: bash
+        continue-on-error: true
+        env:
+          SINCE: ${{ github.event.inputs.since }}
+        run: |
+          set +e
+          exec > >(tee inspect.log) 2>&1
+          PROGRAM=5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+          curl -fsSL https://rialo-artifacts.s3.us-east-2.amazonaws.com/rialoman/stable/install.sh -o install.sh
+          bash install.sh < /dev/null > /dev/null 2>&1
+          export PATH="$HOME/.local/share/rialo/bin:$PATH"
+          rialoman install stable@0.18.1 > /dev/null 2>&1; rialoman use stable@0.18.1 > /dev/null 2>&1
+          export PATH="$(dirname "$(rialoman which rialo)"):$PATH"
+          curl -s -m 30 -X POST -H 'content-type: application/json' https://devnet.rialo.io \
+            -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getSignaturesForAddress\",\"params\":[\"$PROGRAM\",{\"limit\":80}]}" > sigs.json
+          python3 - <<'PY' > sigs.txt
+          import json, os
+          since = int(os.environ.get("SINCE") or 0)
+          d = json.load(open("sigs.json"))
+          rows = d.get("result") or []
+          if not rows:
+              print("NO-RESULT", json.dumps(d)[:300])
+          for r in rows:
+              bt = r.get("blockTime") or 0
+              if bt > 10**11:
+                  bt //= 1000
+              if bt >= since:
+                  print(r["signature"], "ERR" if r.get("err") else "ok", bt, json.dumps(r.get("err"))[:120] if r.get("err") else "")
+          PY
+          echo "== signatures touching the program (since $SINCE)"; cat sigs.txt | cut -c1-150
+          echo "== per-transaction detail"
+          grep -v NO-RESULT sigs.txt | awk '{print $1" "$2}' | head -45 | while read sig st; do
+            echo "-- ${sig:0:10}... $st"
+            rialo -n devnet client transaction "$sig" --no-setup 2>&1 | grep -i -E "handshake|error|fail|custom|invalid|insufficient|status|log" | head -9 | cut -c1-200
+          done
+      - name: publish output
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p /tmp/report
+          { echo "run: $GITHUB_RUN_ID"; sed 's/\x1b\[[0-9;]*[A-Za-z]//g' inspect.log | tail -n 330; } > /tmp/report/inspect-result.txt
+          cd /tmp/report
+          git init -q; git checkout -q -b inspect-results
+          git config user.name "github-actions"; git config user.email "actions@users.noreply.github.com"
+          git add inspect-result.txt; git commit -q -m "inspect output $GITHUB_RUN_ID"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" inspect-results
