@@ -1,0 +1,28 @@
+run: 43563513572
+default stable: rustc 1.100.0 (0ef1bc386 2026-11-09)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.13s
+rex crate: program/target/rex-wasm-components/__rex_component_verify
+== rust 1.86.0
+built: __rex_component_verify.wasm 106170 bytes (rustc 1.86.0 (05f9846f8 2025-03-31))
+wasi:cli/environment@0.2.3 wasi:cli/exit@0.2.3 wasi:cli/stderr@0.2.3 wasi:cli/stdin@0.2.3 wasi:cli/stdout@0.2.3 wasi:clocks/wall-clock@0.2.3 wasi:filesystem/preopens@0.2.2 wasi:filesystem/preopens@0.2.3 wasi:filesystem/types@0.2.3 wasi:io/error@0.2.3 wasi:io/streams@0.2.3 wasi:io/streams@0.2.3. 
+== rust 1.88.0
+built: __rex_component_verify.wasm 104398 bytes (rustc 1.88.0 (6b00bc388 2025-06-23))
+wasi:cli/environment@0.2.3 wasi:cli/exit@0.2.3 wasi:cli/stderr@0.2.3 wasi:cli/stdin@0.2.3 wasi:cli/stdout@0.2.3 wasi:clocks/wall-clock@0.2.3 wasi:filesystem/preopens@0.2.3 wasi:filesystem/types@0.2.3 wasi:io/error@0.2.3 wasi:io/streams@0.2.3 wasi:io/streams@0.2.3. 
+== rust 1.90.0
+built: __rex_component_verify.wasm 100899 bytes (rustc 1.90.0 (1159e78c4 2025-09-14))
+wasi:cli/environment@0.2.3 wasi:cli/exit@0.2.3 wasi:cli/stderr@0.2.3 wasi:cli/stdin@0.2.3 wasi:cli/stdout@0.2.3 wasi:clocks/wall-clock@0.2.3 wasi:filesystem/preopens@0.2.3 wasi:filesystem/types@0.2.3 wasi:io/error@0.2.3 wasi:io/streams@0.2.3 wasi:io/streams@0.2.3. 
+== rust 1.92.0
+built: __rex_component_verify.wasm 93955 bytes (rustc 1.92.0 (ded5c06cf 2025-12-08))
+wasi:cli/environment@0.2.6 wasi:cli/exit@0.2.6 wasi:cli/stderr@0.2.4 wasi:cli/stderr@0.2.6 wasi:io/error@0.2.4 wasi:io/error@0.2.6 wasi:io/streams@0.2.4 wasi:io/streams@0.2.4. wasi:io/streams@0.2.6 wasi:io/streams@0.2.6. 
+== rust 1.94.0
+built: __rex_component_verify.wasm 93985 bytes (rustc 1.94.0 (4a4ef493e 2026-03-02))
+wasi:cli/environment@0.2.0 wasi:cli/environment@0.2.6 wasi:cli/exit@0.2.0 wasi:cli/exit@0.2.6 wasi:cli/stderr@0.2.0 wasi:cli/stderr@0.2.6 wasi:cli/stdin@0.2.0 wasi:cli/stdin@0.2.6 wasi:cli/stdout@0.2.0 wasi:cli/stdout@0.2.6 wasi:cli/terminal-input@0.2.0 wasi:cli/terminal-input@0.2.6 wasi:cli/terminal-output@0.2.0 wasi:cli/terminal-output@0.2.6 wasi:cli/terminal-stderr@0.2.0 wasi:cli/terminal-stderr@0.2.6 wasi:cli/terminal-stdin@0.2.0 wasi:cli/terminal-stdin@0.2.6 wasi:cli/terminal-stdout@0.2.0 wasi:cli/terminal-stdout@0.2.6 wasi:io/error@0.2.0 wasi:io/error@0.2.6 wasi:io/poll@0.2.0 wasi:io/poll@0.2.6 wasi:io/streams@0.2.0 wasi:io/streams@0.2.6 
+== rust 1.96.0
+built: __rex_component_verify.wasm 94217 bytes (rustc 1.96.0 (ac68faa20 2026-05-25))
+wasi:cli/environment@0.2.0 wasi:cli/environment@0.2.6 wasi:cli/exit@0.2.0 wasi:cli/exit@0.2.6 wasi:cli/stderr@0.2.0 wasi:cli/stderr@0.2.6 wasi:cli/stdin@0.2.0 wasi:cli/stdin@0.2.6 wasi:cli/stdout@0.2.0 wasi:cli/stdout@0.2.6 wasi:cli/terminal-input@0.2.0 wasi:cli/terminal-input@0.2.6 wasi:cli/terminal-output@0.2.0 wasi:cli/terminal-output@0.2.6 wasi:cli/terminal-stderr@0.2.0 wasi:cli/terminal-stderr@0.2.6 wasi:cli/terminal-stdin@0.2.0 wasi:cli/terminal-stdin@0.2.6 wasi:cli/terminal-stdout@0.2.0 wasi:cli/terminal-stdout@0.2.6 wasi:io/error@0.2.0 wasi:io/error@0.2.6 wasi:io/poll@0.2.0 wasi:io/poll@0.2.6 wasi:io/streams@0.2.0 wasi:io/streams@0.2.6 
+== rust 1.98.0
+built: __rex_component_verify.wasm 95876 bytes (rustc 1.98.0 (88d9e12ae 2026-08-18))
+wasi:cli/environment@0.2.0 wasi:cli/environment@0.2.9 wasi:cli/exit@0.2.0 wasi:cli/exit@0.2.9 wasi:cli/stderr@0.2.0 wasi:cli/stderr@0.2.9 wasi:cli/stdin@0.2.0 wasi:cli/stdin@0.2.9 wasi:cli/stdout@0.2.0 wasi:cli/stdout@0.2.9 wasi:cli/terminal-input@0.2.0 wasi:cli/terminal-input@0.2.9 wasi:cli/terminal-output@0.2.0 wasi:cli/terminal-output@0.2.9 wasi:cli/terminal-stderr@0.2.0 wasi:cli/terminal-stderr@0.2.9 wasi:cli/terminal-stdin@0.2.0 wasi:cli/terminal-stdin@0.2.9 wasi:cli/terminal-stdout@0.2.0 wasi:cli/terminal-stdout@0.2.9 wasi:clocks/monotonic-clock@0.2.0 wasi:clocks/monotonic-clock@0.2.9 wasi:io/error@0.2.0 wasi:io/error@0.2.9 wasi:io/poll@0.2.0 wasi:io/poll@0.2.9 wasi:io/streams@0.2.0 wasi:io/streams@0.2.9 
+== rust stable
+built: __rex_component_verify.wasm 95969 bytes (rustc 1.100.0 (0ef1bc386 2026-11-09))
+wasi:cli/environment@0.2.12 wasi:cli/exit@0.2.12 wasi:cli/stderr@0.2.12 wasi:cli/stdin@0.2.12 wasi:cli/stdout@0.2.12 wasi:cli/terminal-input@0.2.12 wasi:cli/terminal-output@0.2.12 wasi:cli/terminal-stderr@0.2.12 wasi:cli/terminal-stdin@0.2.12 wasi:cli/terminal-stdout@0.2.12 wasi:clocks/monotonic-clock@0.2.12 wasi:io/error@0.2.12 wasi:io/poll@0.2.12 wasi:io/streams@0.2.12 
