@@ -19,6 +19,7 @@ custom-panic = []
 rialo-venus = "=0.18.1"
 rialo-venus-proc-macro = "=0.18.1"
 handshake-core = { path = "../core" }
+bincode = "=1.3.3"
 
 [package.metadata.rex.dependencies]
 serde_json = "1"

@@ -50,8 +50,8 @@ rialo! {
         }
 
         rex {
-            // Runs on validators. kind: "0" order-status endpoint, "1" GitHub
-            // release, "2" GitHub pull request. Output is a tiny deterministic
+            // Runs on validators. kind: "1" GitHub release, "2" GitHub pull
+            // request. Output is a tiny deterministic
             // string every honest validator must reproduce byte for byte.
             pub fn verify(kind: String, target: String) -> Result<String, String> {
                 use rialo::rex_component::http;
@@ -108,24 +108,6 @@ rialo! {
                     let merged = body.get("merged").and_then(Value::as_bool).unwrap_or(false);
                     let open = body.get("state").and_then(Value::as_str) == Some("open");
                     state = if merged { "merged" } else if open { "open" } else { "closed" }.to_string();
-                } else if kind == "0" {
-                    // order id against a status endpoint you control or trust
-                    if !ok(&target, 64) {
-                        return Err("bad target".to_string());
-                    }
-                    let url = format!("https://YOUR-ENDPOINT.example/api/orders/{}", target);
-                    let response = http::get(&url, &headers, 10_000)
-                        .map_err(|error| format!("request failed: {}", error))?;
-                    if response.status != 200 {
-                        return Ok(format!("HS1|{}|{}|http-{}", kind, target, response.status));
-                    }
-                    let body = serde_json::from_slice::<Value>(&response.body)
-                        .map_err(|_| "invalid JSON".to_string())?;
-                    let status = body.get("status").and_then(Value::as_str).ok_or("missing status")?;
-                    if !["pending", "shipped", "delivered", "cancelled"].contains(&status) {
-                        return Err("unknown status".to_string());
-                    }
-                    state = status.to_string();
                 } else {
                     return Err("unknown kind".to_string());
                 }
@@ -264,8 +246,8 @@ rialo! {
                 if let Some(stuck) = handshake_core::stuck_check(&self.status, &self.started, count, now) {
                     let index = stuck as u64;
                     let target = now.saturating_add(1_000);
-                    self.started[stuck] = now; // do not re-trigger on the next tick
                     if handshake_core::should_retry(self.checks[stuck]) {
+                        self.started[stuck] = now; // do not re-trigger on the next tick
                         msg!("handshake: check {} timed out, retrying", index);
                         AFTER target CALL [run_check buyer: buyer payee: payee index: index];
                     } else {
@@ -296,6 +278,10 @@ rialo! {
                     return Err(ProgramError::InvalidArgument);
                 }
                 self.require_authorized_rex()?;
+                if !handshake_core::may_run_check(self.checks[i]) {
+                    msg!("handshake: no checks left for milestone {}", index);
+                    return Ok(());
+                }
                 // Record the report PDA this request will land in, so on_check
                 // can reject any other account passed as the report.
                 let rex_nonce = super::interface::multi_account_slug(
@@ -338,13 +324,28 @@ rialo! {
                 let report_account = &self.accounts[self.triggering_event_account_index];
                 if report_account.key != &self.report_pda
                     || report_account.owner != &rialo_rex_processor_interface::ID
-                    || report.rex_id.creator != self.owner
                 {
                     msg!("handshake rejected report: not this check's REX report account");
                     return Err(ProgramError::InvalidAccountData);
                 }
-                let verdict = self.verdict(&report, i);
-                msg!("handshake on_check milestone {}: {} updates, verdict {}", index, report.updates.len(), verdict);
+                // Decide from the report stored in the account, never from the
+                // `report` argument: a direct call could pass the right account
+                // with a forged argument.
+                let stored: RexReport = {
+                    let data = report_account
+                        .try_borrow_data()
+                        .map_err(|_| ProgramError::InvalidAccountData)?;
+                    bincode::deserialize(&data[..]).map_err(|_| ProgramError::InvalidAccountData)?
+                };
+                if stored.rex_id.creator != self.owner {
+                    msg!("handshake rejected report: created by someone other than the buyer");
+                    return Err(ProgramError::InvalidAccountData);
+                }
+                if stored != report {
+                    msg!("handshake: report argument differs from the stored report, using the stored one");
+                }
+                let verdict = self.verdict(&stored, i);
+                msg!("handshake on_check milestone {}: {} updates, verdict {}", index, stored.updates.len(), verdict);
                 if verdict == handshake_core::VERDICT_MET {
                     return self.finish(i, handshake_core::Outcome::Pay);
                 }
@@ -377,6 +378,11 @@ rialo! {
                 }
                 if buyer != self.owner || payee != self.payee {
                     return Err(ProgramError::InvalidArgument);
+                }
+                let now = self.now_ms()?;
+                if !handshake_core::may_expire(self.checks[i], self.started[i], now) {
+                    msg!("handshake: expire_check for milestone {} is too early, ignored", index);
+                    return Ok(());
                 }
                 self.finish(i, handshake_core::Outcome::Refund)
             }

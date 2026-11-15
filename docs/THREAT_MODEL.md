@@ -12,15 +12,13 @@ PDA. Each milestone ends exactly once: paid to the seller or refunded to the buy
 1. **Rialo validators and REX.** A report counts only if at least 3 validators
    returned byte-identical, successful payloads (tested). The program cannot
    know whether the network itself enforces further quorum rules.
-2. **The evidence source.** The verifier proves what GitHub's public API (or
-   your status endpoint) says, nothing more.
+2. **The evidence source.** The verifier proves what GitHub's public API says,
+   nothing more.
    - Kind 1 (release): proves a published, non-draft release with that tag
      exists. Whoever can publish releases in that repo controls the answer.
    - Kind 2 (pull request): proves a PR was merged. Whoever can merge into that
      repo controls the answer. **Point kind 2 at a repo the buyer controls**, so
      only the buyer's side can merge: then a merged PR is strong evidence.
-   - Kind 0 (status endpoint): the endpoint's operator controls the answer. Use a
-     neutral source, not either party's server.
 3. **Inconclusive means refund.** If three checks in a row are not unanimous
    (API down, rate-limited, validators disagree) the buyer is refunded. This
    protects the buyer's funds and can cost an honest seller a payment. There is

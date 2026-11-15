@@ -537,6 +537,7 @@ dependencies = [
 name = "handshake"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "handshake-core",
  "rialo-venus",
  "rialo-venus-proc-macro",

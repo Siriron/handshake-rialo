@@ -17,21 +17,19 @@ token, or speculation.
 | --- | --- | --- |
 | 1 | `owner/repo@tag` | a published (non-draft) GitHub release with that tag exists |
 | 2 | `owner/repo#123` | that pull request is merged |
-| 0 | order id | your status endpoint reports `delivered` |
 
 ## Layout
-- `core/` pure decision logic with 17 tests (validation, report classification,
+- `core/` pure decision logic with 21 tests (validation, report classification,
   settlement accounting). The program calls it for every decision that moves money.
 - `program/` the Venus program, its REX verifier, and the artifact crate.
 - `docs/THREAT_MODEL.md` trust assumptions, attacks, and known gaps.
-- `mock-endpoint/` demo status endpoint for kind 0 (Vercel function).
 
 ## Status
 - Deployed and exercised on Rialo devnet. A live two-milestone deal paid one
   milestone and refunded the other with no manual step after funding. Signatures
   and logs are in [`docs/EVIDENCE.md`](docs/EVIDENCE.md), including an earlier
   run that did not settle and the list of paths not yet verified on chain.
-- `core` has 19 tests; CI runs them and type-checks the program on every push.
+- `core` has 21 tests; CI runs them and type-checks the program on every push.
 - Not built yet: the frontend and the receipt page.
 
 ## Toolchain pin (important)

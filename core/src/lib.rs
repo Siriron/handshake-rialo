@@ -28,8 +28,6 @@ pub mod phase {
 
 /// What a milestone is verified against.
 pub mod kind {
-    /// A status endpoint returning {"status": "..."} for an order id.
-    pub const ORDER_STATUS: u64 = 0;
     /// A published GitHub release: target `owner/repo@tag`.
     pub const GITHUB_RELEASE: u64 = 1;
     /// A merged GitHub pull request: target `owner/repo#number`.
@@ -46,12 +44,6 @@ fn slug_ok(s: &str, max: usize) -> bool {
         && !s.starts_with('.')
         && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
         && !s.contains("..")
-}
-
-pub fn valid_order_id(id: &str) -> bool {
-    !id.is_empty()
-        && id.len() <= TARGET_WIDTH
-        && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
 /// `owner/repo@tag`
@@ -80,7 +72,6 @@ pub fn valid_github_pr(target: &str) -> bool {
 
 pub fn valid_target(kind_id: u64, target: &str) -> bool {
     match kind_id {
-        kind::ORDER_STATUS => valid_order_id(target),
         kind::GITHUB_RELEASE => valid_github_release(target),
         kind::GITHUB_PR => valid_github_pr(target),
         _ => false,
@@ -140,7 +131,6 @@ pub fn total(amounts: &[u64; MAX_MILESTONES], count: usize) -> Option<u64> {
 /// The states a verifier may report, per kind: (met, not_met).
 fn states(kind_id: u64) -> Option<(&'static [&'static str], &'static [&'static str])> {
     match kind_id {
-        kind::ORDER_STATUS => Some((&["delivered"], &["pending", "shipped", "cancelled"])),
         kind::GITHUB_RELEASE => Some((&["released"], &["absent"])),
         kind::GITHUB_PR => Some((&["merged"], &["open", "closed"])),
         _ => None,
@@ -219,6 +209,19 @@ pub fn settle(
         Outcome::Refund => phase::REFUNDED,
     };
     Ok(amount)
+}
+
+/// Whether another check may be started for a milestone. Bounds how many REX
+/// requests anyone, including the buyer calling a handler directly, can start.
+pub fn may_run_check(checks: u64) -> bool {
+    checks < MAX_CHECKS
+}
+
+/// Whether a stuck check may be force-refunded: every attempt is used and the
+/// last one has been waiting longer than the timeout. `expire_check` re-checks
+/// this itself, so calling it directly cannot refund a milestone early.
+pub fn may_expire(checks: u64, started_ms: u64, now_ms: u64) -> bool {
+    checks >= MAX_CHECKS && now_ms.saturating_sub(started_ms) > CHECK_TIMEOUT_MS
 }
 
 /// After an inconclusive check: retry, or give up and refund.

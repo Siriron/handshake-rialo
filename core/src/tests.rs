@@ -10,17 +10,6 @@ fn four(s: &str) -> Vec<Option<Vec<u8>>> {
 // ---- target validation -----------------------------------------------------
 
 #[test]
-fn order_ids() {
-    assert!(valid_order_id("delivered-001"));
-    assert!(valid_order_id("A_b-9"));
-    assert!(!valid_order_id(""));
-    assert!(!valid_order_id("has space"));
-    assert!(!valid_order_id("a|b"));
-    assert!(!valid_order_id("a/b"));
-    assert!(!valid_order_id(&"x".repeat(TARGET_WIDTH + 1)));
-}
-
-#[test]
 fn github_release_targets() {
     assert!(valid_github_release("rialo/example@v1.0.0"));
     assert!(valid_github_release("a-b/c.d@release_2"));
@@ -50,12 +39,13 @@ fn github_pr_targets() {
 
 #[test]
 fn kind_routes_to_the_right_validator() {
-    assert!(valid_target(kind::ORDER_STATUS, "ord-1"));
-    assert!(!valid_target(kind::ORDER_STATUS, "o/r@v1"));
     assert!(valid_target(kind::GITHUB_RELEASE, "o/r@v1"));
     assert!(!valid_target(kind::GITHUB_RELEASE, "o/r#1"));
     assert!(valid_target(kind::GITHUB_PR, "o/r#1"));
-    assert!(!valid_target(7, "ord-1"));
+    assert!(!valid_target(kind::GITHUB_PR, "o/r@v1"));
+    // kind 0 (a free-form status endpoint) no longer exists
+    assert!(!valid_target(0, "o/r@v1"));
+    assert!(!valid_target(7, "o/r@v1"));
 }
 
 // ---- schedule --------------------------------------------------------------
@@ -65,20 +55,20 @@ const NOW: u64 = 1_000_000_000_000;
 #[test]
 fn schedule_rules() {
     let ok = |count, prev, amount, dl, k, t| check_milestone(NOW, count, prev, amount, dl, k, t);
-    assert_eq!(ok(0, 0, 5, NOW + 120_000, 0, "ord-1"), Ok(()));
-    assert_eq!(ok(4, 0, 5, NOW + 120_000, 0, "ord-1"), Err(ScheduleError::TooMany));
-    assert_eq!(ok(0, 0, 0, NOW + 120_000, 0, "ord-1"), Err(ScheduleError::ZeroAmount));
-    assert_eq!(ok(0, 0, 5, NOW + 120_000, 0, "bad id"), Err(ScheduleError::TargetInvalid));
-    assert_eq!(ok(0, 0, 5, NOW - 1, 0, "ord-1"), Err(ScheduleError::DeadlineInPast));
-    assert_eq!(ok(0, 0, 5, NOW + MIN_WINDOW_MS - 1, 0, "ord-1"), Err(ScheduleError::TooSoon));
-    assert_eq!(ok(0, 0, 5, NOW + MAX_WINDOW_MS + 1, 0, "ord-1"), Err(ScheduleError::TooFar));
-    assert_eq!(ok(0, 0, 5, NOW + MAX_WINDOW_MS, 0, "ord-1"), Ok(()));
+    assert_eq!(ok(0, 0, 5, NOW + 120_000, 1, "o/r@v1"), Ok(()));
+    assert_eq!(ok(4, 0, 5, NOW + 120_000, 1, "o/r@v1"), Err(ScheduleError::TooMany));
+    assert_eq!(ok(0, 0, 0, NOW + 120_000, 1, "o/r@v1"), Err(ScheduleError::ZeroAmount));
+    assert_eq!(ok(0, 0, 5, NOW + 120_000, 1, "bad id"), Err(ScheduleError::TargetInvalid));
+    assert_eq!(ok(0, 0, 5, NOW - 1, 1, "o/r@v1"), Err(ScheduleError::DeadlineInPast));
+    assert_eq!(ok(0, 0, 5, NOW + MIN_WINDOW_MS - 1, 1, "o/r@v1"), Err(ScheduleError::TooSoon));
+    assert_eq!(ok(0, 0, 5, NOW + MAX_WINDOW_MS + 1, 1, "o/r@v1"), Err(ScheduleError::TooFar));
+    assert_eq!(ok(0, 0, 5, NOW + MAX_WINDOW_MS, 1, "o/r@v1"), Ok(()));
     let prev = NOW + 100_000;
     assert_eq!(
-        ok(1, prev, 5, prev + MIN_GAP_MS - 1, 0, "ord-1"),
+        ok(1, prev, 5, prev + MIN_GAP_MS - 1, 1, "o/r@v1"),
         Err(ScheduleError::NotAfterPrevious)
     );
-    assert_eq!(ok(1, prev, 5, prev + MIN_GAP_MS, 0, "ord-1"), Ok(()));
+    assert_eq!(ok(1, prev, 5, prev + MIN_GAP_MS, 1, "o/r@v1"), Ok(()));
 }
 
 #[test]
@@ -94,11 +84,6 @@ fn total_detects_overflow() {
 
 #[test]
 fn unanimous_met_and_not_met() {
-    let t = "ord-1";
-    assert_eq!(classify(&four("HS1|0|ord-1|delivered"), 0, t), VERDICT_MET);
-    for s in ["pending", "shipped", "cancelled"] {
-        assert_eq!(classify(&four(&format!("HS1|0|ord-1|{}", s)), 0, t), VERDICT_NOT_MET);
-    }
     assert_eq!(classify(&four("HS1|1|o/r@v1|released"), 1, "o/r@v1"), VERDICT_MET);
     assert_eq!(classify(&four("HS1|1|o/r@v1|absent"), 1, "o/r@v1"), VERDICT_NOT_MET);
     assert_eq!(classify(&four("HS1|2|o/r#9|merged"), 2, "o/r#9"), VERDICT_MET);
@@ -107,54 +92,67 @@ fn unanimous_met_and_not_met() {
 }
 
 #[test]
+fn http_failures_and_unknown_states_are_inconclusive() {
+    for s in ["http-403", "http-500", "http-429", "unknown", ""] {
+        let payload = format!("HS1|1|o/r@v1|{}", s);
+        assert_eq!(classify(&four(&payload), 1, "o/r@v1"), VERDICT_INCONCLUSIVE, "{}", s);
+    }
+}
+
+#[test]
 fn minimum_report_count() {
-    let s = "HS1|0|ord-1|delivered";
-    assert_eq!(classify(&[], 0, "ord-1"), VERDICT_INCONCLUSIVE);
-    assert_eq!(classify(&[out(s), out(s)], 0, "ord-1"), VERDICT_INCONCLUSIVE);
-    assert_eq!(classify(&[out(s), out(s), out(s)], 0, "ord-1"), VERDICT_MET);
+    let s = "HS1|1|o/r@v1|released";
+    assert_eq!(classify(&[], 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
+    assert_eq!(classify(&[out(s), out(s)], 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
+    assert_eq!(classify(&[out(s), out(s), out(s)], 1, "o/r@v1"), VERDICT_MET);
 }
 
 #[test]
 fn one_dissenter_or_failure_blocks_the_report() {
-    let good = "HS1|0|ord-1|delivered";
+    let good = "HS1|1|o/r@v1|released";
     let mut r = four(good);
-    r[3] = out("HS1|0|ord-1|pending");
-    assert_eq!(classify(&r, 0, "ord-1"), VERDICT_INCONCLUSIVE);
+    r[3] = out("HS1|1|o/r@v1|absent");
+    assert_eq!(classify(&r, 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
     let mut r = four(good);
     r[2] = None;
-    assert_eq!(classify(&r, 0, "ord-1"), VERDICT_INCONCLUSIVE);
+    assert_eq!(classify(&r, 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
     let mut r = four(good);
     r[0] = None; // first entry failed
-    assert_eq!(classify(&r, 0, "ord-1"), VERDICT_INCONCLUSIVE);
+    assert_eq!(classify(&r, 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
     let r = vec![None, None, None, None];
-    assert_eq!(classify(&r, 0, "ord-1"), VERDICT_INCONCLUSIVE);
+    assert_eq!(classify(&r, 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
 }
 
 #[test]
 fn payload_must_bind_to_this_exact_milestone() {
-    // another order's "delivered" must never satisfy this order
-    assert_eq!(classify(&four("HS1|0|ord-2|delivered"), 0, "ord-1"), VERDICT_INCONCLUSIVE);
+    // another target's "released" must never satisfy this one
+    assert_eq!(classify(&four("HS1|1|o/other@v1|released"), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
+    assert_eq!(classify(&four("HS1|1|o/r@v2|released"), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
     // a different kind must not satisfy this kind
-    assert_eq!(classify(&four("HS1|1|ord-1|delivered"), 0, "ord-1"), VERDICT_INCONCLUSIVE);
+    assert_eq!(classify(&four("HS1|2|o/r@v1|released"), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
     // a state from another kind's vocabulary is rejected
-    assert_eq!(classify(&four("HS1|1|o/r@v1|delivered"), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
-    assert_eq!(classify(&four("HS1|0|ord-1|merged"), 0, "ord-1"), VERDICT_INCONCLUSIVE);
+    assert_eq!(classify(&four("HS1|1|o/r@v1|merged"), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
+    assert_eq!(classify(&four("HS1|2|o/r#9|released"), 2, "o/r#9"), VERDICT_INCONCLUSIVE);
     // wrong version tag, missing prefix, trailing data, case, whitespace
-    assert_eq!(classify(&four("HS2|0|ord-1|delivered"), 0, "ord-1"), VERDICT_INCONCLUSIVE);
-    assert_eq!(classify(&four("0|ord-1|delivered"), 0, "ord-1"), VERDICT_INCONCLUSIVE);
-    assert_eq!(classify(&four("HS1|0|ord-1|delivered "), 0, "ord-1"), VERDICT_INCONCLUSIVE);
-    assert_eq!(classify(&four("HS1|0|ord-1|Delivered"), 0, "ord-1"), VERDICT_INCONCLUSIVE);
-    assert_eq!(classify(&four("HS1|0|ord-1|delivered|x"), 0, "ord-1"), VERDICT_INCONCLUSIVE);
-    // unknown kind
-    assert_eq!(classify(&four("HS1|9|ord-1|delivered"), 9, "ord-1"), VERDICT_INCONCLUSIVE);
+    assert_eq!(classify(&four("HS2|1|o/r@v1|released"), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
+    assert_eq!(classify(&four("1|o/r@v1|released"), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
+    assert_eq!(classify(&four("HS1|1|o/r@v1|released "), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
+    assert_eq!(classify(&four("HS1|1|o/r@v1|Released"), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
+    assert_eq!(classify(&four("HS1|1|o/r@v1|released|x"), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
+    // unknown kinds, including the removed kind 0
+    assert_eq!(classify(&four("HS1|0|o/r@v1|delivered"), 0, "o/r@v1"), VERDICT_INCONCLUSIVE);
+    assert_eq!(classify(&four("HS1|9|o/r@v1|released"), 9, "o/r@v1"), VERDICT_INCONCLUSIVE);
 }
 
 #[test]
 fn oversize_and_non_utf8_payloads_are_rejected() {
-    let big = format!("HS1|0|ord-1|{}", "d".repeat(MAX_PAYLOAD));
-    assert_eq!(classify(&four(&big), 0, "ord-1"), VERDICT_INCONCLUSIVE);
+    let big = format!("HS1|1|o/r@v1|{}", "d".repeat(MAX_PAYLOAD));
+    assert_eq!(classify(&four(&big), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
+    // an otherwise valid payload padded past the cap is rejected outright
+    let padded = format!("HS1|1|o/r@v1|released{}", " ".repeat(MAX_PAYLOAD));
+    assert_eq!(classify(&four(&padded), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
     let bad = vec![Some(vec![0xff, 0xfe, 0xfd]); 4];
-    assert_eq!(classify(&bad, 0, "ord-1"), VERDICT_INCONCLUSIVE);
+    assert_eq!(classify(&bad, 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
 }
 
 // ---- settlement accounting -------------------------------------------------
@@ -309,4 +307,25 @@ fn a_stuck_check_always_ends_in_a_refund() {
     assert_eq!(checks, MAX_CHECKS);
     assert_eq!(settle(&mut status, &amounts, &mut remaining, 0, Outcome::Refund), Ok(10));
     assert!(!any_open(&status, 1));
+}
+
+#[test]
+fn run_check_is_bounded() {
+    assert!(may_run_check(0));
+    assert!(may_run_check(MAX_CHECKS - 1));
+    assert!(!may_run_check(MAX_CHECKS));
+    assert!(!may_run_check(u64::MAX));
+}
+
+#[test]
+fn expire_cannot_refund_early() {
+    let started = 1_000;
+    // attempts remain: never expirable, however late it is
+    assert!(!may_expire(0, started, u64::MAX));
+    assert!(!may_expire(MAX_CHECKS - 1, started, u64::MAX));
+    // all attempts used but the last check has not timed out yet
+    assert!(!may_expire(MAX_CHECKS, started, started + CHECK_TIMEOUT_MS));
+    assert!(!may_expire(MAX_CHECKS, started, 0)); // clock running backwards
+    // all attempts used and the timeout has passed
+    assert!(may_expire(MAX_CHECKS, started, started + CHECK_TIMEOUT_MS + 1));
 }

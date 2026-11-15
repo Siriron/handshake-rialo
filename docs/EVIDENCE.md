@@ -61,7 +61,7 @@ as visible payloads (`HS1|<kind>|<target>|http-<status>`), so other failures are
 diagnosable from the transaction logs.
 
 ## Not yet verified on devnet
-- Pull-request verifier (kind 2) and status-endpoint verifier (kind 0).
+- Pull-request verifier (kind 2).
 - Early `approve`.
 - The stuck-check rescue (`expire_check`): covered by unit tests of the decision
   logic only.
