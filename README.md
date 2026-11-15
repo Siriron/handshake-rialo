@@ -19,17 +19,18 @@ token, or speculation.
 | 2 | `owner/repo#123` | that pull request is merged |
 
 ## Layout
-- `core/` pure decision logic with 21 tests (validation, report classification,
+- `core/` pure decision logic with 22 tests (validation, report classification,
   settlement accounting). The program calls it for every decision that moves money.
 - `program/` the Venus program, its REX verifier, and the artifact crate.
 - `docs/THREAT_MODEL.md` trust assumptions, attacks, and known gaps.
 
 ## Status
-- Deployed and exercised on Rialo devnet. A live two-milestone deal paid one
-  milestone and refunded the other with no manual step after funding. Signatures
-  and logs are in [`docs/EVIDENCE.md`](docs/EVIDENCE.md), including an earlier
-  run that did not settle and the list of paths not yet verified on chain.
-- `core` has 21 tests; CI runs them and type-checks the program on every push.
+- Deployed and exercised on Rialo devnet: both verifiers (release and pull
+  request), early approval, three concurrent deals, and two adversarial calls
+  that fail on chain. Signatures and logs are in
+  [`docs/EVIDENCE.md`](docs/EVIDENCE.md), which also lists the defects testing
+  found and the paths not yet verified on chain.
+- `core` has 22 tests; CI runs them and type-checks the program on every push.
 - Not built yet: the frontend and the receipt page.
 
 ## Toolchain pin (important)

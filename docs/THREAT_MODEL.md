@@ -1,53 +1,69 @@
 # Handshake threat model
 
-Status: written against the code in this repo. Nothing here has run on devnet
-yet. "Tested" below means covered by `cargo test -p handshake-core`; "planned"
-means a devnet test still to be written and run.
+Status: matches the code in this repo. "Tested" means covered by
+`cargo test -p handshake-core` (22 tests). "Devnet" means observed on Rialo
+devnet; see [`EVIDENCE.md`](EVIDENCE.md) for signatures. "Review" means checked
+by reading the code only.
 
 ## What is protected
 Kelvin the buyer locked for up to four milestones, held in the deal's workflow
 PDA. Each milestone ends exactly once: paid to the seller or refunded to the buyer.
 
+## Who can do what
+A deal lives in a workflow account derived from the buyer's key and a slug, so
+only the buyer can address it (devnet: a seller's call against the buyer's deal
+failed with no effect). Everything after `fund` is driven by timers and
+validator reports, not by either party. The adversary that matters is therefore
+the **buyer**, who can sign any instruction against their own deal and wants to
+avoid paying; a seller cannot touch the deal at all.
+
 ## Trust assumptions (read these first)
 1. **Rialo validators and REX.** A report counts only if at least 3 validators
-   returned byte-identical, successful payloads (tested). The program cannot
-   know whether the network itself enforces further quorum rules.
+   returned byte-identical, successful payloads (tested). The program cannot know
+   whether the network enforces further quorum rules.
 2. **The evidence source.** The verifier proves what GitHub's public API says,
    nothing more.
-   - Kind 1 (release): proves a published, non-draft release with that tag
+   - Release (`owner/repo@tag`): a published, non-draft release with that tag
      exists. Whoever can publish releases in that repo controls the answer.
-   - Kind 2 (pull request): proves a PR was merged. Whoever can merge into that
-     repo controls the answer. **Point kind 2 at a repo the buyer controls**, so
+   - Pull request (`owner/repo#number`): the PR is merged. Whoever can merge into
+     that repo controls the answer. **Point this at a repo the buyer controls**, so
      only the buyer's side can merge: then a merged PR is strong evidence.
-3. **Inconclusive means refund.** If three checks in a row are not unanimous
-   (API down, rate-limited, validators disagree) the buyer is refunded. This
-   protects the buyer's funds and can cost an honest seller a payment. There is
-   no dispute process in v1.
+3. **Inconclusive means refund.** If three checks in a row are not unanimous (API
+   down, rate-limited, validators disagree, toolchain mismatch) the buyer is
+   refunded. This protects the buyer's funds and can cost an honest seller a
+   payment. There is no dispute process in v1.
+4. **The toolchain is part of the trust base.** The REX verifier is a WASI
+   component; a Rust version whose WASI imports validators do not support makes
+   every check inconclusive. The version is pinned (see the README).
 
 ## Attacks considered
 | Attack | Defence | Status |
 | --- | --- | --- |
-| Seller or buyer forges the REX report account | `on_check` requires the report account key to equal the PDA recorded when the request was armed, to be owned by the REX processor, and the report creator to be the buyer | code review; planned devnet negative test |
+| Buyer passes a forged `report` argument to `on_check` | the verdict is computed from the report parsed out of the REX report account, never from the argument; the account must be the PDA recorded when the request was armed, be owned by the REX processor, and the report must be created by the buyer | review; handlers cannot be called from the CLI, so not sent on chain |
 | One validator returns a different payload | every raw update must match; fewer than 3 updates is inconclusive | tested |
-| Payload from another milestone or another kind replayed | payload must start with `HS1|<kind>|<exact target>|` and use that kind's vocabulary | tested |
-| Oversized, non-UTF-8, or malformed payloads | rejected before parsing | tested |
-| Milestone paid or refunded twice (late timer, forged handler call, repeated approve) | `settle` only acts on a FUNDED or CHECKING milestone and marks it; later calls do nothing | tested |
+| Payload from another milestone or kind replayed | payload must start with `HS1|<kind>|<exact target>|` and use that kind's vocabulary | tested |
+| Oversized, non-UTF-8, malformed or HTTP-error payloads | rejected before parsing; HTTP failures are visible `http-<status>` payloads and count as inconclusive | tested |
+| Milestone paid or refunded twice | `settle` only acts on an open milestone and marks it; later calls do nothing | tested; devnet (a deal settled once after attacks) |
 | Funds created or lost by accounting bugs | paid + refunded + remaining equals the funded total across 2,000 random sequences | tested |
-| Out-of-range milestone index | rejected | tested |
-| Overflow when summing amounts | checked arithmetic | tested |
+| Seller approves or pays themselves | the deal cannot be addressed by the seller; an early payout also requires the buyer's recorded approval | devnet (seller's `approve` failed); tested |
+| Buyer re-creates a funded deal to reset its state | `create` fails on an existing workflow | devnet |
+| Buyer forces an early refund via `expire_check` | the handler re-checks that all attempts are used and the last one timed out | tested; review |
+| Buyer spams `run_check` to stall or exhaust checks | bounded by the attempt limit; after the last attempt a conclusive report still settles and an inconclusive one refunds | tested; review |
+| Overlapping verification windows | deadlines at least 30 s apart; one check at a time | tested |
 | Hostile targets (path tricks, pipes, spaces, huge strings) | strict per-kind validators, length caps; the REX function re-validates | tested (core); REX copy by review |
-| Overlapping verification windows | deadlines must be at least 30 s apart; one check at a time | tested |
-| Buyer pulls funds early to starve the seller | no cancel path; only `approve` (pays the seller) | by design |
-| Look-alike verifier substituted | program pins the REX bytecode account at create and at every check | code review; planned devnet test |
-| Payee is a program account that cannot be credited | milestone is refunded instead of stuck | code review |
-| Someone calls a handler directly | handlers check buyer and payee against stored owner and payee, then phase | code review; planned devnet test |
+| Out-of-range index, overflowing amounts | rejected, checked arithmetic | tested |
+| Buyer pulls funds early to starve the seller | no cancel path; only `approve`, which pays the seller | by design |
+| Look-alike verifier substituted | the program pins the REX component address at create and at every check | devnet (every check ran against the pinned address) |
+| Payee is a program account that cannot be credited | milestone is refunded instead of stuck | review |
+| A second timer armed from a control call replaces the heartbeat | only `fund` arms a timer from a control call; `approve` records state and the heartbeat acts on it | found and fixed on devnet |
 
 ## Known gaps
 - No disputes, arbiters, partial payouts, tokens, or fees.
 - Timers expire after about 15 s on DevNet, so a heartbeat re-arms every 10 s.
-  Long deals cost many small transactions; windows are capped at 24 hours.
-- GitHub's unauthenticated API allows roughly 60 requests per hour per IP.
-  If validators share egress IPs, checks may come back inconclusive.
-- REX and rent costs fall on the workflow payer (the buyer). Unverified.
-- Handler wiring is untested at runtime. The Venus toolchain does not let this
-  repo unit-test the program itself on a normal machine.
+  Windows are capped at 24 hours; longer deals are untested.
+- GitHub's unauthenticated API allows roughly 60 requests per hour per IP. If
+  validators share egress IPs, checks can come back inconclusive.
+- REX fees and rent fall on the workflow payer (the buyer): about 0.03 RLO for a
+  two-milestone deal on devnet.
+- Direct handler calls with raw transactions, the stuck-check rescue, and long
+  deals have not been exercised on devnet.

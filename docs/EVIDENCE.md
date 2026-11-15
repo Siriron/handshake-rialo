@@ -60,12 +60,56 @@ buyer rather than paying the seller. The verifier also now reports HTTP failures
 as visible payloads (`HS1|<kind>|<target>|http-<status>`), so other failures are
 diagnosable from the transaction logs.
 
+## Live scenarios (run 43692934375, 2026-11-15 UTC)
+Three deals ran at the same time from one buyer, every setup transaction
+confirmed before the next, against the program as deployed by run 43692607972.
+Source: `.github/workflows/test-scenarios.yml`. Seller balances start at 0 except
+C (1 RLO, so it can sign).
+
+| scenario | what was sent | result |
+| --- | --- | --- |
+| A. pull-request verifier | milestone 1 = merged PR `cli/cli#1`, milestone 2 = closed-unmerged PR `cli/cli#7` | seller +0.05 RLO: milestone 1 paid (`24kM4bAryWciJZc3TWSFUxbHVgZes3hB3CEUqUGWMFvbT9WrzEprvsaJoht3qK6xrJLJEWtaZpDxVE4Qr5tDyfHh`), milestone 2 refunded (`24fFdboAAmsV7stJxoSfbbX6HwB2BUD5qsMi2mHKnqFPRjqJ5YEgJ1QaK9pHmrTMiBQVjUqzJM8Cu4ysMrLZed19`) |
+| B. early approval | buyer calls `approve` on a milestone due in 15 minutes | seller +0.03 RLO within about 10 s, paid by the heartbeat (`4H81i4YwthZsx4U1Dhd2XcVKcoRqFSyWE8NfxoNSWbUQU5caDvVucMAHkV4uHpaNHuErfQpkHWzPFNKBq6vupnfR`) |
+| C1. seller approves the buyer's deal | seller signs `approve` against the buyer's deal | failed on chain, `InvalidAccountData` (`WCcfpd42ym48BqXQ73f6bUNnLar6DKTbTSLCN6XrMWyX5Ammy5j97rvTHsQoksqhiJ87xfw9pkCTJeQEngEBcoj`); the call addresses a different workflow derived from the seller's own key, which does not exist |
+| C3. buyer re-creates a funded deal | buyer calls `create` again with the same slug | failed on chain, `InvalidAccountData` (`65Gq9VK4J27wQXAQ7MeVUa9fFupPDFEfa27xcTtZU7LuCSkSmWivNcR72Z8W6SHCHuaUEmzuKi4pAdp1Ts6vKQ1C`); an earlier run's log of the same call reads "Already in a workflow" |
+| C. settlement after the attacks | the deal from C1 and C3, milestone due in about 110 s | still settled exactly once, +0.04 RLO (`2nEZh9wEYCmfKMBJq6WJe7nXmKm63uh98pDWkTV8XfihH4WdtJch222gQ8MDtaiojtCtiQkSsckgyxUkGNKncWf9`) |
+
+Failed transactions cost 0 kelvin. Program logs for A:
+
+    handshake update 1: HS1|2|cli/cli#1|merged
+    handshake on_check milestone 0: 4 updates, verdict 1
+    handshake milestone 0 settled: 50000000 kelvin
+    handshake update 1: HS1|2|cli/cli#7|closed
+    handshake on_check milestone 1: 4 updates, verdict 2
+    handshake: validators agree milestone 1 was not met
+
+## Defects found by testing, and fixed
+1. **`approve` silently killed the heartbeat.** The first version armed a timer
+   from the control call. All control calls run in "branch 0", so that timer used
+   the same subscription address as the heartbeat armed by `fund` (visible as the
+   same `subscription=` address in both transactions) and replaced it: nothing
+   ran afterwards. `approve` now only records the approval in state and the
+   heartbeat, which runs in its own timer branches, pays it. A milestone can only
+   be paid early if it was approved.
+2. **The test harness raced the chain.** `rialo client program invoke` submits a
+   transaction without waiting for it, so back-to-back calls could execute out
+   of order (a `fund` landed before its `add_milestone` and failed). Each call is
+   now confirmed on chain before the next. The failed run is why scenarios B and
+   C failed once before this passing run; neither failure was a settlement bug
+   once the cause was found.
+3. **Report authenticity.** `on_check` used to classify the `report` argument.
+   It now parses the report from the REX report account itself (and rejects any
+   other account or a report not created by the buyer), so a forged argument
+   cannot change a verdict. `run_check` is bounded by the attempt limit and
+   `expire_check` re-verifies its own timeout. These are deployed and unit
+   tested; the forged-argument case itself has not been sent on chain.
+
 ## Not yet verified on devnet
-- Pull-request verifier (kind 2).
-- Early `approve`.
-- The stuck-check rescue (`expire_check`): covered by unit tests of the decision
-  logic only.
-- The negative cases in the threat model (forged report account, repeated
-  settlement, direct handler calls): covered by unit tests of the decision logic
-  only; no adversarial transactions have been sent yet.
-- Deals longer than a few minutes, and more than one deal at a time.
+- Calling a handler directly with a hand-built transaction. The CLI manifest only
+  exposes `create`, `add_milestone`, `fund` and `approve`, so handlers cannot be
+  invoked from the CLI; I have no evidence either way about raw transactions.
+- A forged `report` argument to `on_check`, and `expire_check` called early:
+  covered by unit tests of the decision logic and by code review only.
+- The stuck-check rescue (a check whose report never arrives): unit tests only;
+  it has never triggered on chain.
+- Deals longer than a few minutes.
