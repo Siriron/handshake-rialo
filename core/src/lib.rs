@@ -256,6 +256,19 @@ pub fn stuck_check(
     })
 }
 
+/// First open milestone the buyer has approved. The heartbeat pays it out, so
+/// `approve` itself never has to arm a timer (a second timer armed from a
+/// control call collides with the heartbeat's subscription).
+pub fn next_approved(
+    status: &[u64; MAX_MILESTONES],
+    approved: &[u64; MAX_MILESTONES],
+    count: usize,
+) -> Option<usize> {
+    (0..count.min(MAX_MILESTONES)).find(|i| {
+        approved[*i] == 1 && (status[*i] == phase::FUNDED || status[*i] == phase::CHECKING)
+    })
+}
+
 /// True while any milestone is still open, so the heartbeat must keep going.
 pub fn any_open(status: &[u64; MAX_MILESTONES], count: usize) -> bool {
     status.iter().take(count).any(|s| *s == phase::FUNDED || *s == phase::CHECKING)

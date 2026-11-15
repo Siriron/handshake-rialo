@@ -329,3 +329,23 @@ fn expire_cannot_refund_early() {
     // all attempts used and the timeout has passed
     assert!(may_expire(MAX_CHECKS, started, started + CHECK_TIMEOUT_MS + 1));
 }
+
+#[test]
+fn next_approved_finds_only_open_approved_milestones() {
+    let approved = [0, 1, 0, 1];
+    let status = [phase::FUNDED, phase::FUNDED, phase::FUNDED, phase::FUNDED];
+    assert_eq!(next_approved(&status, &approved, 4), Some(1));
+    // approval is ignored once a milestone is closed
+    let status = [phase::FUNDED, phase::PAID, phase::FUNDED, phase::FUNDED];
+    assert_eq!(next_approved(&status, &approved, 4), Some(3));
+    let status = [phase::FUNDED, phase::PAID, phase::FUNDED, phase::REFUNDED];
+    assert_eq!(next_approved(&status, &approved, 4), None);
+    // a milestone mid-check can still be approved
+    let status = [phase::FUNDED, phase::CHECKING, phase::FUNDED, phase::FUNDED];
+    assert_eq!(next_approved(&status, &approved, 4), Some(1));
+    // approvals beyond `count`, or never made, do nothing
+    assert_eq!(next_approved(&status, &approved, 1), None);
+    assert_eq!(next_approved(&status, &[0, 0, 0, 0], 4), None);
+    // only an explicit 1 counts as approval
+    assert_eq!(next_approved(&status, &[2, 7, 0, 0], 4), None);
+}

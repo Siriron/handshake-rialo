@@ -44,8 +44,20 @@ jobs:
           BUYER="$(rialo keytool address --alias hs-deployer --no-setup 2>&1 | tail -1)"
           echo "buyer=$BUYER"; echo "seller A=$SA B=$SB C=$SC"
           bal() { rialo -n devnet client balance "$1" --no-setup 2>&1 | tail -1 | awk '{print $1}'; }
-          inv() { who="$1"; shift; echo "-- [$who] invoke $*"; out="$(rialo -n devnet -a "$who" client program invoke "$PROGRAM" --program-dir program "$@" --no-setup 2>&1 | tail -12)"; echo "$out"; LAST_SIG="$(echo "$out" | grep -o 'Transaction: [A-Za-z0-9]*' | awk '{print $2}' | tail -1)"; }
-          status_of() { sleep 6; rialo -n devnet client transaction "$1" --no-setup 2>&1 | grep -E "Status:|No workflow|Already in a workflow" | cut -c1-170; }
+          # invoke only submits a transaction; wait until it lands before the next call
+          inv() {
+            who="$1"; shift; echo "-- [$who] invoke $*"
+            out="$(rialo -n devnet -a "$who" client program invoke "$PROGRAM" --program-dir program "$@" --no-setup 2>&1 | tail -12)"; echo "$out"
+            LAST_SIG="$(echo "$out" | grep -o 'Transaction: [A-Za-z0-9]*' | awk '{print $2}' | tail -1)"; LAST_STATUS=""
+            if [ -n "$LAST_SIG" ]; then
+              for k in 1 2 3 4 5 6 7 8 9 10 11 12; do
+                LAST_STATUS="$(rialo -n devnet client transaction "$LAST_SIG" --no-setup 2>&1 | grep -m1 'Status:' | cut -c1-120)"
+                [ -n "$LAST_STATUS" ] && break; sleep 2
+              done
+            fi
+            echo "   on-chain: ${LAST_STATUS:-unknown}"
+          }
+          setup() { inv "$@"; case "$LAST_STATUS" in *Success*) ;; *) echo "   !!! SETUP STEP DID NOT SUCCEED: $*";; esac; }
           now() { date +%s%3N; }
           echo "== top up the buyer to 2.5 RLO, fund seller C as a signer (1 RLO)"
           for i in 1 2 3 4 5 6; do
@@ -59,31 +71,31 @@ jobs:
           SA0="$(bal "$SA")"; SB0="$(bal "$SB")"
 
           echo; echo "######## A: pull-request verifier"
-          inv hs-deployer --function create --rex-bytecode-account "$REX" --arg workflow_pda_slug="$SLUG_A" --arg payee="$SA"
+          setup hs-deployer --function create --rex-bytecode-account "$REX" --arg workflow_pda_slug="$SLUG_A" --arg payee="$SA"
           DA1=$(( $(now) + 100000 )); DA2=$(( DA1 + 70000 ))
-          inv hs-deployer --function add_milestone --arg workflow_pda_slug="$SLUG_A" --arg amount_kelvin=50000000 --arg deadline_ms=$DA1 --arg kind=2 --arg target='cli/cli#1'
-          inv hs-deployer --function add_milestone --arg workflow_pda_slug="$SLUG_A" --arg amount_kelvin=50000000 --arg deadline_ms=$DA2 --arg kind=2 --arg target='cli/cli#7'
-          inv hs-deployer --function fund --arg workflow_pda_slug="$SLUG_A"
+          setup hs-deployer --function add_milestone --arg workflow_pda_slug="$SLUG_A" --arg amount_kelvin=50000000 --arg deadline_ms=$DA1 --arg kind=2 --arg target='cli/cli#1'
+          setup hs-deployer --function add_milestone --arg workflow_pda_slug="$SLUG_A" --arg amount_kelvin=50000000 --arg deadline_ms=$DA2 --arg kind=2 --arg target='cli/cli#7'
+          setup hs-deployer --function fund --arg workflow_pda_slug="$SLUG_A"
 
           echo; echo "######## B: early approval"
-          inv hs-deployer --function create --rex-bytecode-account "$REX" --arg workflow_pda_slug="$SLUG_B" --arg payee="$SB"
+          setup hs-deployer --function create --rex-bytecode-account "$REX" --arg workflow_pda_slug="$SLUG_B" --arg payee="$SB"
           DB=$(( $(now) + 900000 ))
-          inv hs-deployer --function add_milestone --arg workflow_pda_slug="$SLUG_B" --arg amount_kelvin=30000000 --arg deadline_ms=$DB --arg kind=1 --arg target='Siriron/handshake-rialo@v9.9.9'
-          inv hs-deployer --function fund --arg workflow_pda_slug="$SLUG_B"
-          inv hs-deployer --function approve --arg workflow_pda_slug="$SLUG_B" --arg index=0
+          setup hs-deployer --function add_milestone --arg workflow_pda_slug="$SLUG_B" --arg amount_kelvin=30000000 --arg deadline_ms=$DB --arg kind=1 --arg target='Siriron/handshake-rialo@v9.9.9'
+          setup hs-deployer --function fund --arg workflow_pda_slug="$SLUG_B"
+          setup hs-deployer --function approve --arg workflow_pda_slug="$SLUG_B" --arg index=0
 
           echo; echo "######## C: adversarial calls"
-          inv hs-deployer --function create --rex-bytecode-account "$REX" --arg workflow_pda_slug="$SLUG_C" --arg payee="$SC"
+          setup hs-deployer --function create --rex-bytecode-account "$REX" --arg workflow_pda_slug="$SLUG_C" --arg payee="$SC"
           DC=$(( $(now) + 110000 ))
-          inv hs-deployer --function add_milestone --arg workflow_pda_slug="$SLUG_C" --arg amount_kelvin=40000000 --arg deadline_ms=$DC --arg kind=1 --arg target='Siriron/handshake-rialo@v0.1.0'
-          inv hs-deployer --function fund --arg workflow_pda_slug="$SLUG_C"
+          setup hs-deployer --function add_milestone --arg workflow_pda_slug="$SLUG_C" --arg amount_kelvin=40000000 --arg deadline_ms=$DC --arg kind=1 --arg target='Siriron/handshake-rialo@v0.1.0'
+          setup hs-deployer --function fund --arg workflow_pda_slug="$SLUG_C"
           SC1="$(bal "$SC")"; echo "seller C balance before attacks: $SC1"
           echo "-- C1: the seller tries to approve the buyer's milestone"
           inv hs-sc --function approve --arg workflow_pda_slug="$SLUG_C" --arg index=0
-          C1_SIG="$LAST_SIG"; C1_STATUS="$(status_of "$C1_SIG")"; echo "C1 on-chain ($C1_SIG):"; echo "$C1_STATUS"
+          C1_SIG="$LAST_SIG"; C1_STATUS="$LAST_STATUS"
           echo "-- C3: the buyer tries to re-create the funded deal with the same slug"
           inv hs-deployer --function create --rex-bytecode-account "$REX" --arg workflow_pda_slug="$SLUG_C" --arg payee="$SC"
-          C3_SIG="$LAST_SIG"; C3_STATUS="$(status_of "$C3_SIG")"; echo "C3 on-chain ($C3_SIG):"; echo "$C3_STATUS"
+          C3_SIG="$LAST_SIG"; C3_STATUS="$LAST_STATUS"
 
           END=$(( DA2 + 150000 ))
           echo; echo "== waiting for deadlines and checks"

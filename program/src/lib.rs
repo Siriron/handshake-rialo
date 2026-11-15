@@ -47,6 +47,7 @@ rialo! {
             targets: [String; 4],
             report_pda: Pubkey,
             started: [u64; 4],
+            approved: [u64; 4],
         }
 
         rex {
@@ -145,6 +146,7 @@ rialo! {
                 self.remaining = 0;
                 self.report_pda = Pubkey::default();
                 self.started = [0u64; 4];
+                self.approved = [0u64; 4];
                 for i in 0..4 {
                     self.amounts[i] = 0;
                     self.deadlines[i] = 0;
@@ -212,17 +214,23 @@ rialo! {
                 Ok(())
             }
 
-            // Buyer confirms a milestone early. The payout runs in a timer
-            // handler so the payee account is declared on that handler.
+            // Buyer confirms a milestone early. This only records the approval:
+            // the heartbeat pays it out on its next tick. Arming a timer from a
+            // control call would reuse the heartbeat's subscription address (all
+            // control calls run in branch 0) and silently replace it.
             control fn approve(&mut self, index: u64) -> ProgramResult {
                 self.require_owner()?;
                 if index >= self.count || self.deal_status != crate::deal::FUNDED {
                     return Err(ProgramError::InvalidArgument);
                 }
-                let buyer = self.owner;
-                let payee = self.payee;
-                let target = self.now_ms()?.saturating_add(1_000);
-                AFTER target CALL [approved_payout buyer: buyer payee: payee index: index];
+                let i = index as usize;
+                if self.status[i] != handshake_core::phase::FUNDED
+                    && self.status[i] != handshake_core::phase::CHECKING
+                {
+                    return Err(ProgramError::InvalidArgument);
+                }
+                self.approved[i] = 1;
+                msg!("handshake: milestone {} approved by the buyer", index);
                 Ok(())
             }
 
@@ -254,7 +262,14 @@ rialo! {
                         msg!("handshake: check {} timed out for good, refunding", index);
                         AFTER target CALL [expire_check buyer: buyer payee: payee index: index];
                     }
-                } else if let Some(due) = handshake_core::next_due(&self.status, &self.deadlines, count, now) {
+                }
+                if let Some(ap) = handshake_core::next_approved(&self.status, &self.approved, count) {
+                    let index = ap as u64;
+                    let target = now.saturating_add(1_000);
+                    msg!("handshake: paying approved milestone {}", index);
+                    AFTER target CALL [approved_payout buyer: buyer payee: payee index: index];
+                }
+                if let Some(due) = handshake_core::next_due(&self.status, &self.deadlines, count, now) {
                     self.status[due] = handshake_core::phase::CHECKING;
                     self.started[due] = now;
                     let index = due as u64;
@@ -401,6 +416,10 @@ rialo! {
                 }
                 if buyer != self.owner || payee != self.payee {
                     return Err(ProgramError::InvalidArgument);
+                }
+                if self.approved[i] != 1 {
+                    msg!("handshake: milestone {} is not approved, ignored", index);
+                    return Ok(());
                 }
                 self.finish(i, handshake_core::Outcome::Pay)
             }
