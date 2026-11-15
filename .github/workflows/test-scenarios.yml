@@ -1,9 +1,10 @@
 # Live scenarios against the deployed program on Rialo devnet:
 #   A  pull-request verifier: a merged PR pays, a closed-unmerged PR refunds
 #   B  early approval by the buyer pays immediately
-#   C  adversarial calls: the seller tries to approve and to call a handler
-#      directly, the buyer tries to re-create the deal and to expire a check
-#      early. None may move funds or break the deal.
+#   C  adversarial calls: the seller tries to approve the buyer's milestone and
+#      the buyer tries to re-create a funded deal. Both must fail on chain and
+#      the deal must still settle exactly once. (Handlers are not exposed by the
+#      CLI manifest, so direct handler calls cannot be tried from here.)
 # Output (never keys) goes to the scenario-results branch.
 name: test-scenarios
 on: workflow_dispatch
@@ -43,7 +44,8 @@ jobs:
           BUYER="$(rialo keytool address --alias hs-deployer --no-setup 2>&1 | tail -1)"
           echo "buyer=$BUYER"; echo "seller A=$SA B=$SB C=$SC"
           bal() { rialo -n devnet client balance "$1" --no-setup 2>&1 | tail -1 | awk '{print $1}'; }
-          inv() { who="$1"; shift; echo "-- [$who] invoke $*"; rialo -n devnet -a "$who" client program invoke "$PROGRAM" --program-dir program "$@" --no-setup 2>&1 | tail -12; }
+          inv() { who="$1"; shift; echo "-- [$who] invoke $*"; out="$(rialo -n devnet -a "$who" client program invoke "$PROGRAM" --program-dir program "$@" --no-setup 2>&1 | tail -12)"; echo "$out"; LAST_SIG="$(echo "$out" | grep -o 'Transaction: [A-Za-z0-9]*' | awk '{print $2}' | tail -1)"; }
+          status_of() { sleep 6; rialo -n devnet client transaction "$1" --no-setup 2>&1 | grep -E "Status:|No workflow|Already in a workflow" | cut -c1-170; }
           now() { date +%s%3N; }
           echo "== top up the buyer to 2.5 RLO, fund seller C as a signer (1 RLO)"
           for i in 1 2 3 4 5 6; do
@@ -78,13 +80,10 @@ jobs:
           SC1="$(bal "$SC")"; echo "seller C balance before attacks: $SC1"
           echo "-- C1: the seller tries to approve the buyer's milestone"
           inv hs-sc --function approve --arg workflow_pda_slug="$SLUG_C" --arg index=0
-          echo "-- C2: the seller calls the payout handler directly"
-          inv hs-sc --function approved_payout --arg workflow_pda_slug="$SLUG_C" --arg buyer="$BUYER" --arg payee="$SC" --arg index=0
-          SC2="$(bal "$SC")"; echo "seller C balance after C1/C2: $SC2"
+          C1_SIG="$LAST_SIG"; C1_STATUS="$(status_of "$C1_SIG")"; echo "C1 on-chain ($C1_SIG):"; echo "$C1_STATUS"
           echo "-- C3: the buyer tries to re-create the funded deal with the same slug"
           inv hs-deployer --function create --rex-bytecode-account "$REX" --arg workflow_pda_slug="$SLUG_C" --arg payee="$SC"
-          echo "-- C4: the buyer tries to expire the milestone check early"
-          inv hs-deployer --function expire_check --arg workflow_pda_slug="$SLUG_C" --arg buyer="$BUYER" --arg payee="$SC" --arg index=0
+          C3_SIG="$LAST_SIG"; C3_STATUS="$(status_of "$C3_SIG")"; echo "C3 on-chain ($C3_SIG):"; echo "$C3_STATUS"
 
           END=$(( DA2 + 150000 ))
           echo; echo "== waiting for deadlines and checks"
@@ -97,9 +96,9 @@ jobs:
           echo; echo "==================== SUMMARY"
           within "$SAF" "$SA0" 0.0499 0.0501 && echo "RESULT A pull-request verifier: PASS (seller +$SAF; merged PR paid, unmerged PR refunded)" || echo "RESULT A pull-request verifier: FAIL (seller $SA0 -> $SAF, expected +0.05)"
           within "$SBF" "$SB0" 0.0299 0.0301 && echo "RESULT B early approval: PASS (seller +$SBF)" || echo "RESULT B early approval: FAIL (seller $SB0 -> $SBF, expected +0.03)"
-          within "$SC2" "$SC1" -0.01 0.0001 && echo "RESULT C1/C2 seller cannot self-pay: PASS (balance $SC1 -> $SC2)" || echo "RESULT C1/C2 seller cannot self-pay: FAIL ($SC1 -> $SC2)"
+          echo "$C1_STATUS" | grep -q "Failed" && echo "RESULT C1 seller cannot approve the buyer's deal: PASS (tx $C1_SIG failed on chain)" || echo "RESULT C1 seller cannot approve the buyer's deal: FAIL (status: $C1_STATUS)"
+          echo "$C3_STATUS" | grep -q "Failed" && echo "RESULT C3 buyer cannot re-create a funded deal: PASS (tx $C3_SIG failed on chain)" || echo "RESULT C3 buyer cannot re-create a funded deal: FAIL (status: $C3_STATUS)"
           within "$SCF" "$SC1" 0.0299 0.0401 && echo "RESULT C deal still settled once after attacks: PASS (seller $SC1 -> $SCF, expected about +0.04)" || echo "RESULT C deal still settled once after attacks: FAIL (seller $SC1 -> $SCF)"
-          echo "(C3 and C4 outcomes: read the invoke output above)"
       - name: publish output
         if: always()
         shell: bash
