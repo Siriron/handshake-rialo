@@ -5,26 +5,34 @@ name: deploy-devnet
 on: workflow_dispatch
 permissions:
   contents: read
+# One devnet job at a time: they share one deployer key.
+concurrency:
+  group: devnet
+  cancel-in-progress: false
 jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: write   # only to publish the output branch
-    env:
-      DEPLOYER_B64: ${{ secrets.HS_DEPLOYER_KEYPAIR }}
-      PROGRAM_B64: ${{ secrets.HS_PROGRAM_KEYPAIR }}
-      REX_B64: ${{ secrets.HS_REX_KEYPAIR }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10-16
+        with:
+          toolchain: 1.90.0
           targets: wasm32-wasip2
       - name: deploy
         shell: bash
-        continue-on-error: true
+        # The keys are exposed to this step only, not to the actions above.
+        env:
+          DEPLOYER_B64: ${{ secrets.HS_DEPLOYER_KEYPAIR }}
+          PROGRAM_B64: ${{ secrets.HS_PROGRAM_KEYPAIR }}
+          REX_B64: ${{ secrets.HS_REX_KEYPAIR }}
         run: |
-          set +e
           exec > >(tee deploy.log) 2>&1
+          # Rialo publishes no checksum for its installer; it is fetched from the
+          # official artifact bucket and runs only on manual dispatch.
           curl -fsSL https://rialo-artifacts.s3.us-east-2.amazonaws.com/rialoman/stable/install.sh -o install.sh
           bash install.sh < /dev/null > /dev/null 2>&1
           export PATH="$HOME/.local/share/rialo/bin:$PATH"
@@ -36,10 +44,16 @@ jobs:
           printf '%s' "$PROGRAM_B64" | base64 -d > keys/program.keypair
           printf '%s' "$REX_B64" | base64 -d > keys/rex.keypair
           chmod 600 keys/*
-          echo "== addresses (expected: deployer G839F16y..., program 5umz6vh9..., rex 7pycwurx...)"
-          for k in deployer program rex; do
-            echo "$k: $(rialo keytool address --keypair keys/$k.keypair --no-setup 2>&1 | tail -1)"
-          done
+          echo "== the stored keys must load to the pinned addresses"
+          check_key() {
+            got="$(rialo keytool address --keypair "keys/$1.keypair" --no-setup 2>&1 | tail -1)"
+            if [ "$got" = "$2" ]; then echo "$1: $got (expected)"; else echo "$1: $got does NOT match $2"; KEYFAIL=1; fi
+          }
+          KEYFAIL=0
+          check_key deployer G839F16yx2AyBcQvcX2NoVRmq3U8R5xAAfbn1ngdhDP6
+          check_key program 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+          check_key rex 7pycwurxgfQMaTN9KMbHqn8vCcBzgZhJKvB4epLyjpH3
+          if [ "$KEYFAIL" = "1" ]; then echo "DEPLOY ABORTED: wrong keys"; exit 1; fi
           rialo keytool attach hs-deployer keys/deployer.keypair --no-setup 2>&1 | tail -2
           echo "== fund the deployer to at least 3 RLO"
           for i in 1 2 3 4 5 6; do
@@ -56,10 +70,14 @@ jobs:
           echo "== build artifact"
           cargo build --manifest-path program/artifact/Cargo.toml 2>&1 | tail -3
           echo "== deploy-venus"
-          rialo -n devnet -a hs-deployer client program deploy-venus program \
-            --keypair keys/program.keypair --rex-keypair keys/rex.keypair --no-setup 2>&1 | tail -30
+          DEPLOY_OUT="$(rialo -n devnet -a hs-deployer client program deploy-venus program \
+            --keypair keys/program.keypair --rex-keypair keys/rex.keypair --no-setup 2>&1 | tail -30)"
+          echo "$DEPLOY_OUT"
           echo "== balance after deploy"
           rialo -n devnet -a hs-deployer client balance --no-setup 2>&1 | tail -1
+          echo "$DEPLOY_OUT" | grep -q "Venus program deployed at 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h" \
+            && echo "$DEPLOY_OUT" | grep -q "REX components deployed at 7pycwurxgfQMaTN9KMbHqn8vCcBzgZhJKvB4epLyjpH3" \
+            || { echo "DEPLOY FAILED: expected program and REX addresses not reported"; exit 1; }
       - name: publish output
         if: always()
         shell: bash

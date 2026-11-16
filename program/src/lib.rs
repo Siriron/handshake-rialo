@@ -58,9 +58,13 @@ rialo! {
                 use rialo::rex_component::http;
                 use serde_json::Value;
 
+                // Same rules as handshake-core::slug_ok (the target was already
+                // validated when the milestone was added; this is defence in depth).
                 let ok = |s: &str, max: usize| {
                     !s.is_empty()
                         && s.len() <= max
+                        && !s.starts_with('.')
+                        && !s.contains("..")
                         && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
                 };
                 let headers = vec![
@@ -136,7 +140,11 @@ rialo! {
                     return Err(ProgramError::MissingRequiredSignature);
                 }
                 self.require_authorized_rex()?;
-                if payee == *self.payer_account().key {
+                if payee == *self.payer_account().key
+                    || payee == self.workflow_pda()
+                    || payee == Pubkey::default()
+                    || payee == *self.program_id
+                {
                     return Err(ProgramError::InvalidArgument);
                 }
                 self.owner = *self.payer_account().key;
@@ -198,6 +206,10 @@ rialo! {
                     return Err(ProgramError::InvalidArgument);
                 }
                 let count = self.count as usize;
+                if !handshake_core::can_fund(self.now_ms()?, self.deadlines[0]) {
+                    msg!("handshake: the first deadline has passed, create a new deal");
+                    return Err(ProgramError::InvalidArgument);
+                }
                 let sum = handshake_core::total(&self.amounts, count)
                     .ok_or(ProgramError::InvalidArgument)?;
                 self.deposit(sum)?;
@@ -251,7 +263,16 @@ rialo! {
                 }
                 let now = self.now_ms()?;
                 // Rescue a check whose report never arrived: retry, then refund.
-                if let Some(stuck) = handshake_core::stuck_check(&self.status, &self.started, count, now) {
+                // One action per tick, in priority order: an approved milestone is
+                // paid, otherwise a stuck check is retried or expired, otherwise
+                // the next due milestone starts its check. An approved milestone
+                // must never be refunded by the expiry path.
+                if let Some(ap) = handshake_core::next_approved(&self.status, &self.approved, count) {
+                    let index = ap as u64;
+                    let target = now.saturating_add(1_000);
+                    msg!("handshake: paying approved milestone {}", index);
+                    AFTER target CALL [approved_payout buyer: buyer payee: payee index: index];
+                } else if let Some(stuck) = handshake_core::stuck_check(&self.status, &self.started, count, now) {
                     let index = stuck as u64;
                     let target = now.saturating_add(1_000);
                     if handshake_core::should_retry(self.checks[stuck]) {
@@ -262,14 +283,7 @@ rialo! {
                         msg!("handshake: check {} timed out for good, refunding", index);
                         AFTER target CALL [expire_check buyer: buyer payee: payee index: index];
                     }
-                }
-                if let Some(ap) = handshake_core::next_approved(&self.status, &self.approved, count) {
-                    let index = ap as u64;
-                    let target = now.saturating_add(1_000);
-                    msg!("handshake: paying approved milestone {}", index);
-                    AFTER target CALL [approved_payout buyer: buyer payee: payee index: index];
-                }
-                if let Some(due) = handshake_core::next_due(&self.status, &self.deadlines, count, now) {
+                } else if let Some(due) = handshake_core::next_due(&self.status, &self.deadlines, count, now) {
                     self.status[due] = handshake_core::phase::CHECKING;
                     self.started[due] = now;
                     let index = due as u64;
@@ -394,6 +408,10 @@ rialo! {
                 if buyer != self.owner || payee != self.payee {
                     return Err(ProgramError::InvalidArgument);
                 }
+                if self.approved[i] == 1 {
+                    msg!("handshake: milestone {} is approved, not expiring it", index);
+                    return Ok(());
+                }
                 let now = self.now_ms()?;
                 if !handshake_core::may_expire(self.checks[i], self.started[i], now) {
                     msg!("handshake: expire_check for milestone {} is too early, ignored", index);
@@ -499,7 +517,11 @@ rialo! {
             fn deposit(&self, amount: u64) -> ProgramResult {
                 let payer = self.payer_account().clone();
                 let workflow = self.accounts[1].clone();
-                if !payer.is_writable || !workflow.is_writable || workflow.owner != self.program_id {
+                if !payer.is_writable
+                    || !workflow.is_writable
+                    || workflow.owner != self.program_id
+                    || workflow.key != &self.workflow_pda()
+                {
                     return Err(ProgramError::InvalidArgument);
                 }
                 let system = self
@@ -529,6 +551,7 @@ rialo! {
             fn release(&self, to: &AccountInfo, amount: u64) -> ProgramResult {
                 let workflow = &self.accounts[1];
                 if workflow.owner != self.program_id
+                    || workflow.key != &self.workflow_pda()
                     || !workflow.is_writable
                     || !to.is_writable
                     || to.key == workflow.key

@@ -3,6 +3,10 @@
 //! calls these functions for every decision that moves money.
 
 pub const MAX_MILESTONES: usize = 4;
+/// Smallest milestone amount (kelvin; 1 RLO = 1e9 kelvin). Paying a brand-new
+/// account less than the rent-exempt minimum fails at the runtime, which would
+/// turn a verified milestone into a refund, so dust is refused up front.
+pub const MIN_AMOUNT_KELVIN: u64 = 10_000_000;
 /// A milestone deadline must be at least this far in the future (ms).
 pub const MIN_WINDOW_MS: u64 = 60_000;
 /// ...and at most this far (ms). Bounds heartbeat count and cost.
@@ -13,6 +17,8 @@ pub const MIN_GAP_MS: u64 = 30_000;
 pub const MAX_CHECKS: u64 = 3;
 /// A check with no usable report after this long is treated as inconclusive.
 pub const CHECK_TIMEOUT_MS: u64 = 45_000;
+/// A report needs at least this many validator updates. DevNet has 4; a network
+/// with fewer validators would make every check inconclusive (a refund).
 pub const MIN_REPORTS: usize = 3;
 pub const MAX_PAYLOAD: usize = 128;
 pub const TARGET_WIDTH: usize = 64;
@@ -42,7 +48,8 @@ fn slug_ok(s: &str, max: usize) -> bool {
     !s.is_empty()
         && s.len() <= max
         && !s.starts_with('.')
-        && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
         && !s.contains("..")
 }
 
@@ -51,8 +58,12 @@ pub fn valid_github_release(target: &str) -> bool {
     if target.len() > TARGET_WIDTH {
         return false;
     }
-    let Some((repo_part, tag)) = target.split_once('@') else { return false };
-    let Some((owner, repo)) = repo_part.split_once('/') else { return false };
+    let Some((repo_part, tag)) = target.split_once('@') else {
+        return false;
+    };
+    let Some((owner, repo)) = repo_part.split_once('/') else {
+        return false;
+    };
     slug_ok(owner, 39) && slug_ok(repo, 100) && slug_ok(tag, 40) && !repo.contains('/')
 }
 
@@ -61,8 +72,12 @@ pub fn valid_github_pr(target: &str) -> bool {
     if target.len() > TARGET_WIDTH {
         return false;
     }
-    let Some((repo_part, number)) = target.split_once('#') else { return false };
-    let Some((owner, repo)) = repo_part.split_once('/') else { return false };
+    let Some((repo_part, number)) = target.split_once('#') else {
+        return false;
+    };
+    let Some((owner, repo)) = repo_part.split_once('/') else {
+        return false;
+    };
     let number_ok = !number.is_empty()
         && number.len() <= 9
         && !number.starts_with('0')
@@ -81,13 +96,12 @@ pub fn valid_target(kind_id: u64, target: &str) -> bool {
 #[derive(Debug, PartialEq, Eq)]
 pub enum ScheduleError {
     TooMany,
-    ZeroAmount,
+    AmountTooSmall,
     TargetInvalid,
     DeadlineInPast,
     TooSoon,
     TooFar,
     NotAfterPrevious,
-    Overflow,
 }
 
 /// Validates one milestone being added. `count` is how many already exist and
@@ -104,13 +118,15 @@ pub fn check_milestone(
     if count >= MAX_MILESTONES {
         return Err(ScheduleError::TooMany);
     }
-    if amount == 0 {
-        return Err(ScheduleError::ZeroAmount);
+    if amount < MIN_AMOUNT_KELVIN {
+        return Err(ScheduleError::AmountTooSmall);
     }
     if !valid_target(kind_id, target) {
         return Err(ScheduleError::TargetInvalid);
     }
-    let window = deadline_ms.checked_sub(now_ms).ok_or(ScheduleError::DeadlineInPast)?;
+    let window = deadline_ms
+        .checked_sub(now_ms)
+        .ok_or(ScheduleError::DeadlineInPast)?;
     if window < MIN_WINDOW_MS {
         return Err(ScheduleError::TooSoon);
     }
@@ -123,9 +139,19 @@ pub fn check_milestone(
     Ok(())
 }
 
+/// A deal may only be funded while its first deadline is still ahead, so a
+/// deal that sat unfunded past its deadline cannot be funded into an instant
+/// check.
+pub fn can_fund(now_ms: u64, first_deadline_ms: u64) -> bool {
+    first_deadline_ms > now_ms
+}
+
 /// Sum of the first `count` amounts, or None on overflow.
 pub fn total(amounts: &[u64; MAX_MILESTONES], count: usize) -> Option<u64> {
-    amounts.iter().take(count).try_fold(0u64, |acc, a| acc.checked_add(*a))
+    amounts
+        .iter()
+        .take(count)
+        .try_fold(0u64, |acc, a| acc.checked_add(*a))
 }
 
 /// The states a verifier may report, per kind: (met, not_met).
@@ -150,17 +176,25 @@ pub fn classify(outputs: &[Option<Vec<u8>>], kind_id: u64, target: &str) -> u64 
     if outputs.len() < MIN_REPORTS {
         return VERDICT_INCONCLUSIVE;
     }
-    let Some(Some(first)) = outputs.first() else { return VERDICT_INCONCLUSIVE };
+    let Some(Some(first)) = outputs.first() else {
+        return VERDICT_INCONCLUSIVE;
+    };
     if first.len() > MAX_PAYLOAD {
         return VERDICT_INCONCLUSIVE;
     }
     if outputs.iter().any(|o| o.as_ref() != Some(first)) {
         return VERDICT_INCONCLUSIVE;
     }
-    let Ok(text) = std::str::from_utf8(first) else { return VERDICT_INCONCLUSIVE };
+    let Ok(text) = std::str::from_utf8(first) else {
+        return VERDICT_INCONCLUSIVE;
+    };
     let prefix = payload_prefix(kind_id, target);
-    let Some(state) = text.strip_prefix(prefix.as_str()) else { return VERDICT_INCONCLUSIVE };
-    let Some((met, not_met)) = states(kind_id) else { return VERDICT_INCONCLUSIVE };
+    let Some(state) = text.strip_prefix(prefix.as_str()) else {
+        return VERDICT_INCONCLUSIVE;
+    };
+    let Some((met, not_met)) = states(kind_id) else {
+        return VERDICT_INCONCLUSIVE;
+    };
     if met.contains(&state) {
         VERDICT_MET
     } else if not_met.contains(&state) {
@@ -271,7 +305,10 @@ pub fn next_approved(
 
 /// True while any milestone is still open, so the heartbeat must keep going.
 pub fn any_open(status: &[u64; MAX_MILESTONES], count: usize) -> bool {
-    status.iter().take(count).any(|s| *s == phase::FUNDED || *s == phase::CHECKING)
+    status
+        .iter()
+        .take(count)
+        .any(|s| *s == phase::FUNDED || *s == phase::CHECKING)
 }
 
 #[cfg(test)]

@@ -23,6 +23,15 @@ fn github_release_targets() {
     assert!(!valid_github_release("owner/repo@v1|x"));
     assert!(!valid_github_release(".hidden/repo@v1"));
     assert!(!valid_github_release(&format!("o/{}@v1", "r".repeat(70))));
+    // characters that must never reach a URL: unicode, NUL, newlines, quotes
+    assert!(!valid_github_release("ö/r@v1"));
+    assert!(!valid_github_release("o/r@v1\0"));
+    assert!(!valid_github_release("o/r@v1\n"));
+    assert!(!valid_github_release("o/r@\"v1\""));
+    assert!(!valid_github_release("o/r@v1?x=1"));
+    assert!(!valid_github_release("o/r@v1#frag"));
+    assert!(!valid_github_release("o/r@v1/.."));
+    assert!(!valid_github_release("o/r@%2e%2e"));
 }
 
 #[test]
@@ -35,6 +44,12 @@ fn github_pr_targets() {
     assert!(!valid_github_pr("rialo/example"));
     assert!(!valid_github_pr("rialo/example#1234567890"));
     assert!(!valid_github_pr("rialo/example@v1"));
+    assert!(!valid_github_pr("rialo/example#1\0"));
+    assert!(!valid_github_pr("rialo/example#１２")); // full-width digits
+    assert!(!valid_github_pr("rialo/example#-1"));
+    assert!(!valid_github_pr("rialo/example# 1"));
+    assert!(!valid_github_pr("../example#1"));
+    assert!(valid_github_pr("rialo/example#999999999"));
 }
 
 #[test]
@@ -51,24 +66,52 @@ fn kind_routes_to_the_right_validator() {
 // ---- schedule --------------------------------------------------------------
 
 const NOW: u64 = 1_000_000_000_000;
+const AMT: u64 = 50_000_000;
 
 #[test]
 fn schedule_rules() {
     let ok = |count, prev, amount, dl, k, t| check_milestone(NOW, count, prev, amount, dl, k, t);
-    assert_eq!(ok(0, 0, 5, NOW + 120_000, 1, "o/r@v1"), Ok(()));
-    assert_eq!(ok(4, 0, 5, NOW + 120_000, 1, "o/r@v1"), Err(ScheduleError::TooMany));
-    assert_eq!(ok(0, 0, 0, NOW + 120_000, 1, "o/r@v1"), Err(ScheduleError::ZeroAmount));
-    assert_eq!(ok(0, 0, 5, NOW + 120_000, 1, "bad id"), Err(ScheduleError::TargetInvalid));
-    assert_eq!(ok(0, 0, 5, NOW - 1, 1, "o/r@v1"), Err(ScheduleError::DeadlineInPast));
-    assert_eq!(ok(0, 0, 5, NOW + MIN_WINDOW_MS - 1, 1, "o/r@v1"), Err(ScheduleError::TooSoon));
-    assert_eq!(ok(0, 0, 5, NOW + MAX_WINDOW_MS + 1, 1, "o/r@v1"), Err(ScheduleError::TooFar));
-    assert_eq!(ok(0, 0, 5, NOW + MAX_WINDOW_MS, 1, "o/r@v1"), Ok(()));
+    assert_eq!(ok(0, 0, AMT, NOW + 120_000, 1, "o/r@v1"), Ok(()));
+    assert_eq!(
+        ok(4, 0, AMT, NOW + 120_000, 1, "o/r@v1"),
+        Err(ScheduleError::TooMany)
+    );
+    assert_eq!(
+        ok(0, 0, 0, NOW + 120_000, 1, "o/r@v1"),
+        Err(ScheduleError::AmountTooSmall)
+    );
+    assert_eq!(
+        ok(0, 0, MIN_AMOUNT_KELVIN - 1, NOW + 120_000, 1, "o/r@v1"),
+        Err(ScheduleError::AmountTooSmall)
+    );
+    assert_eq!(
+        ok(0, 0, MIN_AMOUNT_KELVIN, NOW + 120_000, 1, "o/r@v1"),
+        Ok(())
+    );
+    assert_eq!(
+        ok(0, 0, AMT, NOW + 120_000, 1, "bad id"),
+        Err(ScheduleError::TargetInvalid)
+    );
+    assert_eq!(
+        ok(0, 0, AMT, NOW - 1, 1, "o/r@v1"),
+        Err(ScheduleError::DeadlineInPast)
+    );
+    assert_eq!(ok(0, 0, AMT, NOW, 1, "o/r@v1"), Err(ScheduleError::TooSoon));
+    assert_eq!(
+        ok(0, 0, AMT, NOW + MIN_WINDOW_MS - 1, 1, "o/r@v1"),
+        Err(ScheduleError::TooSoon)
+    );
+    assert_eq!(
+        ok(0, 0, AMT, NOW + MAX_WINDOW_MS + 1, 1, "o/r@v1"),
+        Err(ScheduleError::TooFar)
+    );
+    assert_eq!(ok(0, 0, AMT, NOW + MAX_WINDOW_MS, 1, "o/r@v1"), Ok(()));
     let prev = NOW + 100_000;
     assert_eq!(
-        ok(1, prev, 5, prev + MIN_GAP_MS - 1, 1, "o/r@v1"),
+        ok(1, prev, AMT, prev + MIN_GAP_MS - 1, 1, "o/r@v1"),
         Err(ScheduleError::NotAfterPrevious)
     );
-    assert_eq!(ok(1, prev, 5, prev + MIN_GAP_MS, 1, "o/r@v1"), Ok(()));
+    assert_eq!(ok(1, prev, AMT, prev + MIN_GAP_MS, 1, "o/r@v1"), Ok(()));
 }
 
 #[test]
@@ -84,18 +127,38 @@ fn total_detects_overflow() {
 
 #[test]
 fn unanimous_met_and_not_met() {
-    assert_eq!(classify(&four("HS1|1|o/r@v1|released"), 1, "o/r@v1"), VERDICT_MET);
-    assert_eq!(classify(&four("HS1|1|o/r@v1|absent"), 1, "o/r@v1"), VERDICT_NOT_MET);
-    assert_eq!(classify(&four("HS1|2|o/r#9|merged"), 2, "o/r#9"), VERDICT_MET);
-    assert_eq!(classify(&four("HS1|2|o/r#9|open"), 2, "o/r#9"), VERDICT_NOT_MET);
-    assert_eq!(classify(&four("HS1|2|o/r#9|closed"), 2, "o/r#9"), VERDICT_NOT_MET);
+    assert_eq!(
+        classify(&four("HS1|1|o/r@v1|released"), 1, "o/r@v1"),
+        VERDICT_MET
+    );
+    assert_eq!(
+        classify(&four("HS1|1|o/r@v1|absent"), 1, "o/r@v1"),
+        VERDICT_NOT_MET
+    );
+    assert_eq!(
+        classify(&four("HS1|2|o/r#9|merged"), 2, "o/r#9"),
+        VERDICT_MET
+    );
+    assert_eq!(
+        classify(&four("HS1|2|o/r#9|open"), 2, "o/r#9"),
+        VERDICT_NOT_MET
+    );
+    assert_eq!(
+        classify(&four("HS1|2|o/r#9|closed"), 2, "o/r#9"),
+        VERDICT_NOT_MET
+    );
 }
 
 #[test]
 fn http_failures_and_unknown_states_are_inconclusive() {
     for s in ["http-403", "http-500", "http-429", "unknown", ""] {
         let payload = format!("HS1|1|o/r@v1|{}", s);
-        assert_eq!(classify(&four(&payload), 1, "o/r@v1"), VERDICT_INCONCLUSIVE, "{}", s);
+        assert_eq!(
+            classify(&four(&payload), 1, "o/r@v1"),
+            VERDICT_INCONCLUSIVE,
+            "{}",
+            s
+        );
     }
 }
 
@@ -103,8 +166,14 @@ fn http_failures_and_unknown_states_are_inconclusive() {
 fn minimum_report_count() {
     let s = "HS1|1|o/r@v1|released";
     assert_eq!(classify(&[], 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
-    assert_eq!(classify(&[out(s), out(s)], 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
-    assert_eq!(classify(&[out(s), out(s), out(s)], 1, "o/r@v1"), VERDICT_MET);
+    assert_eq!(
+        classify(&[out(s), out(s)], 1, "o/r@v1"),
+        VERDICT_INCONCLUSIVE
+    );
+    assert_eq!(
+        classify(&[out(s), out(s), out(s)], 1, "o/r@v1"),
+        VERDICT_MET
+    );
 }
 
 #[test]
@@ -126,22 +195,58 @@ fn one_dissenter_or_failure_blocks_the_report() {
 #[test]
 fn payload_must_bind_to_this_exact_milestone() {
     // another target's "released" must never satisfy this one
-    assert_eq!(classify(&four("HS1|1|o/other@v1|released"), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
-    assert_eq!(classify(&four("HS1|1|o/r@v2|released"), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
+    assert_eq!(
+        classify(&four("HS1|1|o/other@v1|released"), 1, "o/r@v1"),
+        VERDICT_INCONCLUSIVE
+    );
+    assert_eq!(
+        classify(&four("HS1|1|o/r@v2|released"), 1, "o/r@v1"),
+        VERDICT_INCONCLUSIVE
+    );
     // a different kind must not satisfy this kind
-    assert_eq!(classify(&four("HS1|2|o/r@v1|released"), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
+    assert_eq!(
+        classify(&four("HS1|2|o/r@v1|released"), 1, "o/r@v1"),
+        VERDICT_INCONCLUSIVE
+    );
     // a state from another kind's vocabulary is rejected
-    assert_eq!(classify(&four("HS1|1|o/r@v1|merged"), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
-    assert_eq!(classify(&four("HS1|2|o/r#9|released"), 2, "o/r#9"), VERDICT_INCONCLUSIVE);
+    assert_eq!(
+        classify(&four("HS1|1|o/r@v1|merged"), 1, "o/r@v1"),
+        VERDICT_INCONCLUSIVE
+    );
+    assert_eq!(
+        classify(&four("HS1|2|o/r#9|released"), 2, "o/r#9"),
+        VERDICT_INCONCLUSIVE
+    );
     // wrong version tag, missing prefix, trailing data, case, whitespace
-    assert_eq!(classify(&four("HS2|1|o/r@v1|released"), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
-    assert_eq!(classify(&four("1|o/r@v1|released"), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
-    assert_eq!(classify(&four("HS1|1|o/r@v1|released "), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
-    assert_eq!(classify(&four("HS1|1|o/r@v1|Released"), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
-    assert_eq!(classify(&four("HS1|1|o/r@v1|released|x"), 1, "o/r@v1"), VERDICT_INCONCLUSIVE);
+    assert_eq!(
+        classify(&four("HS2|1|o/r@v1|released"), 1, "o/r@v1"),
+        VERDICT_INCONCLUSIVE
+    );
+    assert_eq!(
+        classify(&four("1|o/r@v1|released"), 1, "o/r@v1"),
+        VERDICT_INCONCLUSIVE
+    );
+    assert_eq!(
+        classify(&four("HS1|1|o/r@v1|released "), 1, "o/r@v1"),
+        VERDICT_INCONCLUSIVE
+    );
+    assert_eq!(
+        classify(&four("HS1|1|o/r@v1|Released"), 1, "o/r@v1"),
+        VERDICT_INCONCLUSIVE
+    );
+    assert_eq!(
+        classify(&four("HS1|1|o/r@v1|released|x"), 1, "o/r@v1"),
+        VERDICT_INCONCLUSIVE
+    );
     // unknown kinds, including the removed kind 0
-    assert_eq!(classify(&four("HS1|0|o/r@v1|delivered"), 0, "o/r@v1"), VERDICT_INCONCLUSIVE);
-    assert_eq!(classify(&four("HS1|9|o/r@v1|released"), 9, "o/r@v1"), VERDICT_INCONCLUSIVE);
+    assert_eq!(
+        classify(&four("HS1|0|o/r@v1|delivered"), 0, "o/r@v1"),
+        VERDICT_INCONCLUSIVE
+    );
+    assert_eq!(
+        classify(&four("HS1|9|o/r@v1|released"), 9, "o/r@v1"),
+        VERDICT_INCONCLUSIVE
+    );
 }
 
 #[test]
@@ -162,7 +267,10 @@ fn settle_pays_and_refunds_once() {
     let amounts = [10, 20, 30, 40];
     let mut status = [phase::FUNDED; 4];
     let mut remaining = 100;
-    assert_eq!(settle(&mut status, &amounts, &mut remaining, 0, Outcome::Pay), Ok(10));
+    assert_eq!(
+        settle(&mut status, &amounts, &mut remaining, 0, Outcome::Pay),
+        Ok(10)
+    );
     assert_eq!(status[0], phase::PAID);
     assert_eq!(remaining, 90);
     // a late or forged second call is rejected and changes nothing
@@ -172,7 +280,10 @@ fn settle_pays_and_refunds_once() {
     );
     assert_eq!(status[0], phase::PAID);
     assert_eq!(remaining, 90);
-    assert_eq!(settle(&mut status, &amounts, &mut remaining, 1, Outcome::Refund), Ok(20));
+    assert_eq!(
+        settle(&mut status, &amounts, &mut remaining, 1, Outcome::Refund),
+        Ok(20)
+    );
     assert_eq!(status[1], phase::REFUNDED);
 }
 
@@ -227,7 +338,11 @@ fn conservation_under_random_sequences() {
         let mut settled = [false; 4];
         for _ in 0..24 {
             let index = (next() % 6) as usize; // includes out-of-range indexes
-            let outcome = if next() % 2 == 0 { Outcome::Pay } else { Outcome::Refund };
+            let outcome = if next() % 2 == 0 {
+                Outcome::Pay
+            } else {
+                Outcome::Refund
+            };
             let is_pay = outcome == Outcome::Pay;
             if next() % 5 == 0 && index < 4 && status[index] == phase::FUNDED {
                 status[index] = phase::CHECKING; // mid-check is still settleable
@@ -235,9 +350,16 @@ fn conservation_under_random_sequences() {
             if let Ok(amount) = settle(&mut status, &amounts, &mut remaining, index, outcome) {
                 assert!(!settled[index], "milestone settled twice");
                 settled[index] = true;
-                if is_pay { paid += amount } else { refunded += amount }
+                if is_pay {
+                    paid += amount
+                } else {
+                    refunded += amount
+                }
             }
             assert_eq!(paid + refunded + remaining, funded);
+            if !any_open(&status, count) {
+                assert_eq!(remaining, 0, "a fully settled deal must hold nothing back");
+            }
         }
     }
 }
@@ -279,8 +401,14 @@ fn stuck_check_detection() {
     let started = [1_000, 0, 0, 0];
     let mut status = [phase::CHECKING, phase::FUNDED, phase::FUNDED, phase::FUNDED];
     // not stuck until strictly past the timeout
-    assert_eq!(stuck_check(&status, &started, 4, 1_000 + CHECK_TIMEOUT_MS), None);
-    assert_eq!(stuck_check(&status, &started, 4, 1_000 + CHECK_TIMEOUT_MS + 1), Some(0));
+    assert_eq!(
+        stuck_check(&status, &started, 4, 1_000 + CHECK_TIMEOUT_MS),
+        None
+    );
+    assert_eq!(
+        stuck_check(&status, &started, 4, 1_000 + CHECK_TIMEOUT_MS + 1),
+        Some(0)
+    );
     // only CHECKING milestones can be stuck
     status[0] = phase::PAID;
     assert_eq!(stuck_check(&status, &started, 4, u64::MAX), None);
@@ -288,25 +416,89 @@ fn stuck_check_detection() {
     let status = [phase::FUNDED, phase::CHECKING, phase::FUNDED, phase::FUNDED];
     let started = [0, 5, 0, 0];
     assert_eq!(stuck_check(&status, &started, 1, u64::MAX), None);
-    assert_eq!(stuck_check(&status, &started, 2, 5 + CHECK_TIMEOUT_MS + 1), Some(1));
+    assert_eq!(
+        stuck_check(&status, &started, 2, 5 + CHECK_TIMEOUT_MS + 1),
+        Some(1)
+    );
     // a clock that runs backwards never marks a check stuck
     assert_eq!(stuck_check(&status, &started, 2, 0), None);
 }
 
+/// Simulates the heartbeat exactly as `beat`, `run_check`, `expire_check` and
+/// `finish` use the decision functions, with REX that never reports. Every
+/// milestone must end refunded in bounded time, whatever the deadlines are.
 #[test]
-fn a_stuck_check_always_ends_in_a_refund() {
-    // simulate: checks time out repeatedly; after MAX_CHECKS attempts the
-    // milestone must be refundable and the heartbeat must be able to stop
-    let amounts = [10, 0, 0, 0];
-    let mut status = [phase::CHECKING, 0, 0, 0];
-    let mut remaining = 10;
-    let mut checks = 1u64;
-    while should_retry(checks) {
-        checks += 1; // retried after a timeout
+fn silent_rex_always_ends_in_a_refund_in_bounded_time() {
+    const BEAT: u64 = 10_000;
+    const RUN_CHECK_DELAY: u64 = 1_000;
+    for count in 1..=4usize {
+        let mut deadlines = [0u64; 4];
+        for (i, d) in deadlines.iter_mut().enumerate().take(count) {
+            *d = 100_000 + (i as u64) * MIN_GAP_MS;
+        }
+        let amounts = [MIN_AMOUNT_KELVIN; 4];
+        let mut status = [phase::CREATED; 4];
+        for s in status.iter_mut().take(count) {
+            *s = phase::FUNDED;
+        }
+        let mut remaining = total(&amounts, count).unwrap();
+        let (mut checks, mut started) = ([0u64; 4], [0u64; 4]);
+        let mut pending_run_check: Option<(usize, u64)> = None;
+        let mut pending_expire: Option<(usize, u64)> = None;
+        let mut now = 0u64;
+        let limit = 3_600_000; // one simulated hour
+        while any_open(&status, count) && now < limit {
+            // timers armed on earlier ticks fire first
+            if let Some((i, at)) = pending_run_check {
+                if now >= at {
+                    pending_run_check = None;
+                    if status[i] == phase::CHECKING && may_run_check(checks[i]) {
+                        checks[i] += 1;
+                        started[i] = now;
+                    }
+                }
+            }
+            if let Some((i, at)) = pending_expire {
+                if now >= at {
+                    pending_expire = None;
+                    if status[i] == phase::CHECKING && may_expire(checks[i], started[i], now) {
+                        settle(&mut status, &amounts, &mut remaining, i, Outcome::Refund).unwrap();
+                    }
+                }
+            }
+            // the heartbeat tick
+            if any_open(&status, count) {
+                if let Some(stuck) = stuck_check(&status, &started, count, now) {
+                    if should_retry(checks[stuck]) {
+                        started[stuck] = now;
+                        pending_run_check = Some((stuck, now + RUN_CHECK_DELAY));
+                    } else {
+                        pending_expire = Some((stuck, now + RUN_CHECK_DELAY));
+                    }
+                } else if let Some(due) = next_due(&status, &deadlines, count, now) {
+                    status[due] = phase::CHECKING;
+                    started[due] = now;
+                    pending_run_check = Some((due, now + RUN_CHECK_DELAY));
+                }
+            }
+            now += BEAT;
+        }
+        assert!(
+            !any_open(&status, count),
+            "{count} milestones still open after an hour"
+        );
+        assert_eq!(remaining, 0);
+        assert!(status.iter().take(count).all(|s| *s == phase::REFUNDED));
+        eprintln!(
+            "silent REX, {count} milestone(s): all refunded at t={} s",
+            now / 1000
+        );
+        // bounded: the last deadline, plus per milestone every check running
+        // to its timeout (rounded up to heartbeat ticks) and the final expiry
+        let per_milestone = MAX_CHECKS * (CHECK_TIMEOUT_MS + 3 * BEAT) + 2 * BEAT;
+        let bound = deadlines[count - 1] + per_milestone * count as u64;
+        assert!(now <= bound, "took {now} ms, bound {bound} ms");
     }
-    assert_eq!(checks, MAX_CHECKS);
-    assert_eq!(settle(&mut status, &amounts, &mut remaining, 0, Outcome::Refund), Ok(10));
-    assert!(!any_open(&status, 1));
 }
 
 #[test]
@@ -326,8 +518,12 @@ fn expire_cannot_refund_early() {
     // all attempts used but the last check has not timed out yet
     assert!(!may_expire(MAX_CHECKS, started, started + CHECK_TIMEOUT_MS));
     assert!(!may_expire(MAX_CHECKS, started, 0)); // clock running backwards
-    // all attempts used and the timeout has passed
-    assert!(may_expire(MAX_CHECKS, started, started + CHECK_TIMEOUT_MS + 1));
+                                                  // all attempts used and the timeout has passed
+    assert!(may_expire(
+        MAX_CHECKS,
+        started,
+        started + CHECK_TIMEOUT_MS + 1
+    ));
 }
 
 #[test]
@@ -348,4 +544,12 @@ fn next_approved_finds_only_open_approved_milestones() {
     assert_eq!(next_approved(&status, &[0, 0, 0, 0], 4), None);
     // only an explicit 1 counts as approval
     assert_eq!(next_approved(&status, &[2, 7, 0, 0], 4), None);
+}
+
+#[test]
+fn funding_requires_a_future_first_deadline() {
+    assert!(can_fund(100, 101));
+    assert!(!can_fund(100, 100));
+    assert!(!can_fund(100, 99));
+    assert!(!can_fund(u64::MAX, u64::MAX));
 }

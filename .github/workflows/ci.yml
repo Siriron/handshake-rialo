@@ -9,13 +9,25 @@ jobs:
   test:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # only used by the report step, and only on push events
+      contents: write   # used only by the report step, and only on push events
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10-16
+        with:
+          toolchain: 1.90.0
+          targets: wasm32-wasip2
+          components: rustfmt, clippy
       - name: prepare logs
         shell: bash
-        run: touch core-test.log program-check.log
+        run: touch core-fmt.log core-clippy.log core-test.log program-check.log
+      - name: format (core)
+        shell: bash
+        run: cargo fmt --manifest-path core/Cargo.toml --check 2>&1 | tee core-fmt.log
+      - name: lint (core, warnings are errors)
+        shell: bash
+        run: cargo clippy --manifest-path core/Cargo.toml --all-targets -- -D warnings 2>&1 | tee core-clippy.log
       - name: core tests
         shell: bash
         run: cargo test --manifest-path core/Cargo.toml 2>&1 | tee core-test.log
@@ -31,6 +43,8 @@ jobs:
             echo "commit: $GITHUB_SHA"
             echo "run: $GITHUB_RUN_ID"
             echo "job-status: ${{ job.status }}"
+            echo; echo "--- format (tail)"; tail -n 15 core-fmt.log || true
+            echo; echo "--- clippy (tail)"; tail -n 15 core-clippy.log || true
             echo; echo "--- core tests (tail)"; tail -n 40 core-test.log || true
             echo; echo "--- program check (tail)"; tail -n 30 program-check.log || true
           } > /tmp/report/ci-result.txt
