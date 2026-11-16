@@ -30,6 +30,9 @@ jobs:
           PROGRAM_B64: ${{ secrets.HS_PROGRAM_KEYPAIR }}
           REX_B64: ${{ secrets.HS_REX_KEYPAIR }}
         run: |
+          # Not strict on purpose: Rialo's installer exits non-zero even when it
+          # works. Every step that matters is checked explicitly below.
+          set +e
           exec > >(tee deploy.log) 2>&1
           # Rialo publishes no checksum for its installer; it is fetched from the
           # official artifact bucket and runs only on manual dispatch.
@@ -37,8 +40,11 @@ jobs:
           bash install.sh < /dev/null > /dev/null 2>&1
           export PATH="$HOME/.local/share/rialo/bin:$PATH"
           rialoman install stable@0.18.1 > /dev/null 2>&1; rialoman use stable@0.18.1 > /dev/null 2>&1
-          export PATH="$(dirname "$(rialoman which rialo)"):$PATH"
+          RIALO_BIN="$(rialoman which rialo 2>/dev/null)"
+          [ -n "$RIALO_BIN" ] || { echo "DEPLOY ABORTED: the rialo toolchain did not install"; exit 1; }
+          export PATH="$(dirname "$RIALO_BIN"):$PATH"
           rialo --version
+          rialo --version | grep -q "0.18.1" || { echo "DEPLOY ABORTED: unexpected rialo version"; exit 1; }
           mkdir -p keys
           printf '%s' "$DEPLOYER_B64" | base64 -d > keys/deployer.keypair
           printf '%s' "$PROGRAM_B64" | base64 -d > keys/program.keypair
@@ -66,9 +72,13 @@ jobs:
           done
           echo "rustc in repo: $(rustc --version)"
           echo "== generate WIT and manifest"
-          cargo check --manifest-path program/Cargo.toml 2>&1 | tail -2
+          cargo check --manifest-path program/Cargo.toml > check.log 2>&1 \
+            || { tail -20 check.log; echo "DEPLOY ABORTED: type-check failed"; exit 1; }
+          tail -2 check.log
           echo "== build artifact"
-          cargo build --manifest-path program/artifact/Cargo.toml 2>&1 | tail -3
+          cargo build --manifest-path program/artifact/Cargo.toml > build.log 2>&1 \
+            || { tail -30 build.log; echo "DEPLOY ABORTED: artifact build failed"; exit 1; }
+          tail -3 build.log
           echo "== deploy-venus"
           DEPLOY_OUT="$(rialo -n devnet -a hs-deployer client program deploy-venus program \
             --keypair keys/program.keypair --rex-keypair keys/rex.keypair --no-setup 2>&1 | tail -30)"

@@ -45,7 +45,9 @@ jobs:
           bash install.sh < /dev/null > /dev/null 2>&1
           export PATH="$HOME/.local/share/rialo/bin:$PATH"
           rialoman install stable@0.18.1 > /dev/null 2>&1; rialoman use stable@0.18.1 > /dev/null 2>&1
-          export PATH="$(dirname "$(rialoman which rialo)"):$PATH"
+          RIALO_BIN="$(rialoman which rialo 2>/dev/null)"
+          [ -n "$RIALO_BIN" ] || { echo "SCENARIOS ABORTED: the rialo toolchain did not install"; exit 1; }
+          export PATH="$(dirname "$RIALO_BIN"):$PATH"
           mkdir -p keys
           printf '%s' "$DEPLOYER_B64" | base64 -d > keys/deployer.keypair; chmod 600 keys/*
           rialo keytool attach hs-deployer keys/deployer.keypair --no-setup 2>&1 | tail -1
