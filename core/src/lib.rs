@@ -245,10 +245,14 @@ pub fn settle(
     Ok(amount)
 }
 
-/// Whether another check may be started for a milestone. Bounds how many REX
-/// requests anyone, including the buyer calling a handler directly, can start.
-pub fn may_run_check(checks: u64) -> bool {
-    checks < MAX_CHECKS
+/// Whether a check attempt may start. An attempt is *armed* (counted in
+/// `armed`) by the heartbeat or by an inconclusive report, and *consumed*
+/// (counted in `ran`) when `run_check` starts it. Counting at arming time keeps
+/// the budget finite even if `run_check` itself keeps failing (for example a
+/// buyer who drained the wallet that pays for REX), and a handler called
+/// directly can never run more attempts than were armed.
+pub fn may_run_check(armed: u64, ran: u64) -> bool {
+    ran < armed && armed <= MAX_CHECKS
 }
 
 /// Whether a stuck check may be force-refunded: every attempt is used and the

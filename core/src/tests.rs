@@ -425,88 +425,113 @@ fn stuck_check_detection() {
 }
 
 /// Simulates the heartbeat exactly as `beat`, `run_check`, `expire_check` and
-/// `finish` use the decision functions, with REX that never reports. Every
-/// milestone must end refunded in bounded time, whatever the deadlines are.
+/// `finish` use the decision functions. Whatever the checks do (never report, or
+/// `run_check` itself failing every time), every milestone must end refunded in
+/// bounded time.
 #[test]
-fn silent_rex_always_ends_in_a_refund_in_bounded_time() {
+fn a_dead_check_pipeline_always_ends_in_a_refund_in_bounded_time() {
     const BEAT: u64 = 10_000;
     const RUN_CHECK_DELAY: u64 = 1_000;
-    for count in 1..=4usize {
-        let mut deadlines = [0u64; 4];
-        for (i, d) in deadlines.iter_mut().enumerate().take(count) {
-            *d = 100_000 + (i as u64) * MIN_GAP_MS;
-        }
-        let amounts = [MIN_AMOUNT_KELVIN; 4];
-        let mut status = [phase::CREATED; 4];
-        for s in status.iter_mut().take(count) {
-            *s = phase::FUNDED;
-        }
-        let mut remaining = total(&amounts, count).unwrap();
-        let (mut checks, mut started) = ([0u64; 4], [0u64; 4]);
-        let mut pending_run_check: Option<(usize, u64)> = None;
-        let mut pending_expire: Option<(usize, u64)> = None;
-        let mut now = 0u64;
-        let limit = 3_600_000; // one simulated hour
-        while any_open(&status, count) && now < limit {
-            // timers armed on earlier ticks fire first
-            if let Some((i, at)) = pending_run_check {
-                if now >= at {
-                    pending_run_check = None;
-                    if status[i] == phase::CHECKING && may_run_check(checks[i]) {
-                        checks[i] += 1;
-                        started[i] = now;
+    for run_check_works in [true, false] {
+        for count in 1..=4usize {
+            let mut deadlines = [0u64; 4];
+            for (i, d) in deadlines.iter_mut().enumerate().take(count) {
+                *d = 100_000 + (i as u64) * MIN_GAP_MS;
+            }
+            let amounts = [MIN_AMOUNT_KELVIN; 4];
+            let mut status = [phase::CREATED; 4];
+            for s in status.iter_mut().take(count) {
+                *s = phase::FUNDED;
+            }
+            let mut remaining = total(&amounts, count).unwrap();
+            let (mut armed, mut ran, mut started) = ([0u64; 4], [0u64; 4], [0u64; 4]);
+            let mut pending_run_check: Option<(usize, u64)> = None;
+            let mut pending_expire: Option<(usize, u64)> = None;
+            let mut now = 0u64;
+            let limit = 3_600_000; // one simulated hour
+            while any_open(&status, count) && now < limit {
+                // timers armed on earlier ticks fire first
+                if let Some((i, at)) = pending_run_check {
+                    if now >= at {
+                        pending_run_check = None;
+                        // run_check either works (consumes the armed attempt and
+                        // the REX report never arrives) or fails and reverts
+                        if run_check_works
+                            && status[i] == phase::CHECKING
+                            && may_run_check(armed[i], ran[i])
+                        {
+                            ran[i] += 1;
+                            started[i] = now;
+                        }
                     }
                 }
-            }
-            if let Some((i, at)) = pending_expire {
-                if now >= at {
-                    pending_expire = None;
-                    if status[i] == phase::CHECKING && may_expire(checks[i], started[i], now) {
-                        settle(&mut status, &amounts, &mut remaining, i, Outcome::Refund).unwrap();
+                if let Some((i, at)) = pending_expire {
+                    if now >= at {
+                        pending_expire = None;
+                        if status[i] == phase::CHECKING && may_expire(armed[i], started[i], now) {
+                            settle(&mut status, &amounts, &mut remaining, i, Outcome::Refund)
+                                .unwrap();
+                        }
                     }
                 }
-            }
-            // the heartbeat tick
-            if any_open(&status, count) {
-                if let Some(stuck) = stuck_check(&status, &started, count, now) {
-                    if should_retry(checks[stuck]) {
-                        started[stuck] = now;
-                        pending_run_check = Some((stuck, now + RUN_CHECK_DELAY));
-                    } else {
-                        pending_expire = Some((stuck, now + RUN_CHECK_DELAY));
+                // the heartbeat tick
+                if any_open(&status, count) {
+                    if let Some(stuck) = stuck_check(&status, &started, count, now) {
+                        if should_retry(armed[stuck]) {
+                            started[stuck] = now;
+                            armed[stuck] += 1;
+                            pending_run_check = Some((stuck, now + RUN_CHECK_DELAY));
+                        } else {
+                            pending_expire = Some((stuck, now + RUN_CHECK_DELAY));
+                        }
+                    } else if let Some(due) = next_due(&status, &deadlines, count, now) {
+                        status[due] = phase::CHECKING;
+                        started[due] = now;
+                        armed[due] += 1;
+                        pending_run_check = Some((due, now + RUN_CHECK_DELAY));
                     }
-                } else if let Some(due) = next_due(&status, &deadlines, count, now) {
-                    status[due] = phase::CHECKING;
-                    started[due] = now;
-                    pending_run_check = Some((due, now + RUN_CHECK_DELAY));
                 }
+                now += BEAT;
             }
-            now += BEAT;
+            assert!(
+                !any_open(&status, count),
+                "{count} milestones still open after an hour (run_check_works={run_check_works})"
+            );
+            assert_eq!(remaining, 0);
+            assert!(status.iter().take(count).all(|s| *s == phase::REFUNDED));
+            assert!(
+                armed.iter().all(|a| *a <= MAX_CHECKS),
+                "attempt budget exceeded"
+            );
+            eprintln!(
+                "run_check_works={run_check_works}, {count} milestone(s): all refunded at t={} s",
+                now / 1000
+            );
+            // bounded: the last deadline, plus per milestone every attempt
+            // running to its timeout (rounded up to heartbeat ticks) and the
+            // final expiry
+            let per_milestone = MAX_CHECKS * (CHECK_TIMEOUT_MS + 3 * BEAT) + 2 * BEAT;
+            let bound = deadlines[count - 1] + per_milestone * count as u64;
+            assert!(now <= bound, "took {now} ms, bound {bound} ms");
         }
-        assert!(
-            !any_open(&status, count),
-            "{count} milestones still open after an hour"
-        );
-        assert_eq!(remaining, 0);
-        assert!(status.iter().take(count).all(|s| *s == phase::REFUNDED));
-        eprintln!(
-            "silent REX, {count} milestone(s): all refunded at t={} s",
-            now / 1000
-        );
-        // bounded: the last deadline, plus per milestone every check running
-        // to its timeout (rounded up to heartbeat ticks) and the final expiry
-        let per_milestone = MAX_CHECKS * (CHECK_TIMEOUT_MS + 3 * BEAT) + 2 * BEAT;
-        let bound = deadlines[count - 1] + per_milestone * count as u64;
-        assert!(now <= bound, "took {now} ms, bound {bound} ms");
     }
 }
 
 #[test]
 fn run_check_is_bounded() {
-    assert!(may_run_check(0));
-    assert!(may_run_check(MAX_CHECKS - 1));
-    assert!(!may_run_check(MAX_CHECKS));
-    assert!(!may_run_check(u64::MAX));
+    // nothing armed, nothing to run
+    assert!(!may_run_check(0, 0));
+    // an armed attempt can be consumed exactly once
+    assert!(may_run_check(1, 0));
+    assert!(!may_run_check(1, 1));
+    assert!(may_run_check(MAX_CHECKS, MAX_CHECKS - 1));
+    assert!(!may_run_check(MAX_CHECKS, MAX_CHECKS));
+    // arming beyond the budget never allows a run
+    assert!(!may_run_check(MAX_CHECKS + 1, 0));
+    assert!(!may_run_check(u64::MAX, 0));
+    // a direct call cannot run more attempts than were armed
+    assert!(!may_run_check(2, 2));
+    assert!(!may_run_check(2, 3));
 }
 
 #[test]

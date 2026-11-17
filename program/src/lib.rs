@@ -48,6 +48,7 @@ rialo! {
             report_pda: Pubkey,
             started: [u64; 4],
             approved: [u64; 4],
+            ran: [u64; 4],
         }
 
         rex {
@@ -155,6 +156,7 @@ rialo! {
                 self.report_pda = Pubkey::default();
                 self.started = [0u64; 4];
                 self.approved = [0u64; 4];
+                self.ran = [0u64; 4];
                 for i in 0..4 {
                     self.amounts[i] = 0;
                     self.deadlines[i] = 0;
@@ -277,6 +279,7 @@ rialo! {
                     let target = now.saturating_add(1_000);
                     if handshake_core::should_retry(self.checks[stuck]) {
                         self.started[stuck] = now; // do not re-trigger on the next tick
+                        self.checks[stuck] = self.checks[stuck].saturating_add(1);
                         msg!("handshake: check {} timed out, retrying", index);
                         AFTER target CALL [run_check buyer: buyer payee: payee index: index];
                     } else {
@@ -286,6 +289,7 @@ rialo! {
                 } else if let Some(due) = handshake_core::next_due(&self.status, &self.deadlines, count, now) {
                     self.status[due] = handshake_core::phase::CHECKING;
                     self.started[due] = now;
+                    self.checks[due] = self.checks[due].saturating_add(1);
                     let index = due as u64;
                     msg!("handshake: milestone {} is due, starting its check", index);
                     let target = now.saturating_add(1_000);
@@ -299,6 +303,9 @@ rialo! {
             // The REX request lives in its own timer branch so every check gets
             // fresh REX and subscription PDAs.
             handler fn run_check(&mut self, buyer: Pubkey, payee: Pubkey, index: u64) -> ProgramResult {
+                if index >= 4 {
+                    return Ok(());
+                }
                 let i = index as usize;
                 if i >= 4 || self.status[i] != handshake_core::phase::CHECKING {
                     return Ok(());
@@ -307,7 +314,7 @@ rialo! {
                     return Err(ProgramError::InvalidArgument);
                 }
                 self.require_authorized_rex()?;
-                if !handshake_core::may_run_check(self.checks[i]) {
+                if !handshake_core::may_run_check(self.checks[i], self.ran[i]) {
                     msg!("handshake: no checks left for milestone {}", index);
                     return Ok(());
                 }
@@ -319,11 +326,11 @@ rialo! {
                     self.rex_accounts_block_index,
                 );
                 self.report_pda = derive_report_address(self.payer_account().key, rex_nonce).0;
-                self.checks[i] = self.checks[i].saturating_add(1);
+                self.ran[i] = self.ran[i].saturating_add(1);
                 self.started[i] = self.now_ms()?;
                 let kind_tag = self.kinds[i].to_string();
                 let target_text = self.targets[i].trim_end_matches('\0').to_string();
-                msg!("handshake check #{} for milestone {}", self.checks[i], index);
+                msg!("handshake check #{} for milestone {}", self.ran[i], index);
                 AFTER report = [verify
                     kind: kind_tag
                     target: target_text
@@ -343,6 +350,9 @@ rialo! {
             ) -> ProgramResult {
                 let _ = WriteAccountInfo::from(buyer);
                 let _ = WriteAccountInfo::from(payee);
+                if index >= 4 {
+                    return Ok(());
+                }
                 let i = index as usize;
                 if i >= 4 || self.status[i] != handshake_core::phase::CHECKING {
                     return Ok(());
@@ -386,6 +396,7 @@ rialo! {
                     msg!("handshake: no conclusive check for milestone {}, refunding", index);
                     return self.finish(i, handshake_core::Outcome::Refund);
                 }
+                self.checks[i] = self.checks[i].saturating_add(1);
                 let target = self.now_ms()?.saturating_add(crate::RETRY_MS);
                 AFTER target CALL [run_check buyer: buyer payee: payee index: index];
                 Ok(())
@@ -401,6 +412,9 @@ rialo! {
             ) -> ProgramResult {
                 let _ = WriteAccountInfo::from(buyer);
                 let _ = WriteAccountInfo::from(payee);
+                if index >= 4 {
+                    return Ok(());
+                }
                 let i = index as usize;
                 if i >= 4 || self.status[i] != handshake_core::phase::CHECKING {
                     return Ok(());
@@ -428,10 +442,10 @@ rialo! {
             ) -> ProgramResult {
                 let _ = WriteAccountInfo::from(buyer);
                 let _ = WriteAccountInfo::from(payee);
-                let i = index as usize;
-                if i >= 4 {
+                if index >= 4 {
                     return Ok(());
                 }
+                let i = index as usize;
                 if buyer != self.owner || payee != self.payee {
                     return Err(ProgramError::InvalidArgument);
                 }
