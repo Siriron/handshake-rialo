@@ -1,0 +1,119 @@
+commit: e8a86efcb5ffb38a8b8857f3480373956a126f27
+run: 44028572250
+job-status: success
+
+==================== SUMMARY
+RESULT A pull-request verifier: PASS (seller +0.05; merged PR paid, unmerged PR refunded)
+RESULT D release verifier: PASS (seller +0.05; published release paid, missing tag refunded)
+RESULT B early approval: PASS (seller +0.03)
+RESULT C1 seller cannot approve the buyer's deal: PASS (tx 3eh9JU29ab8f8pkheaJnU4K1JokyoKCng2MWu6bjPv6nQoSLskaqaFzdbYrcBsjyDRvHrBgC2UDyqErR1eRFURBB failed on chain)
+RESULT C3 buyer cannot re-create a funded deal: PASS (tx 5e2ov7Bs22GQjFGQiUaT9ahsZHHBtKzeuUeaz5nEQ1r4gZNZeer7Ssgzpc9pUeYW2Z3eBcHwrByQq72KY6haYKym failed on chain)
+RESULT C deal still settled once after attacks: PASS (seller 1 -> 1.04, expected about +0.04)
+
+---------------- full log
+Keypair hs-deployer added.
+buyer=G839F16yx2AyBcQvcX2NoVRmq3U8R5xAAfbn1ngdhDP6
+seller A=HoVgXTiotDD8ZoYKT1nbk7fews8fRQwBvQoiRqtZorzj B=25nhLT1dQkgrzZsEB7o5KNc3sw2tZWtLtBtxQSwB2m8V C=4guBY27Q9m4UJn9gQTTP4mfMrqTeALWGwGUR4Lwwc1Mu D=9soZLP5h4CcE33CUFcbWw6LP8WLUD95MQPoh5Fkz5VQK
+== top up the buyer to 2.5 RLO, fund seller C as a signer (1 RLO)
+buyer balance: 3.21014128
+New balance: 1 RLO
+== manifest
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 32.23s
+
+######## A: pull-request verifier
+-- [hs-deployer] invoke --function create --rex-bytecode-account 7pycwurxgfQMaTN9KMbHqn8vCcBzgZhJKvB4epLyjpH3 --arg workflow_pda_slug=100155db6477eef0ceefd8d686f7e254b80b993b49bf82b1fbff20a588876150 --arg payee=HoVgXTiotDD8ZoYKT1nbk7fews8fRQwBvQoiRqtZorzj
+Invoked create on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: 2Bxt4fYGu46FHyxwr1LuUcnujJyUnBBaCxbLhUAjoVj2pV3M5dS2tqpXKHTnazL6jcAsVVdD6v94TaqHrFV5uWch
+   on-chain: Status: Success
+-- [hs-deployer] invoke --function add_milestone --arg workflow_pda_slug=100155db6477eef0ceefd8d686f7e254b80b993b49bf82b1fbff20a588876150 --arg amount_kelvin=50000000 --arg deadline_ms=1794895660663 --arg kind=2 --arg target=cli/cli#1
+Invoked add_milestone on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: pFP2nReLZDJFgSuuFq8REjpekSjX54YGidQP9kRa629ieifJC76ovRkcpjYh3aRziVNJi55NtUBVg7usWttDtfD
+   on-chain: Status: Success
+-- [hs-deployer] invoke --function add_milestone --arg workflow_pda_slug=100155db6477eef0ceefd8d686f7e254b80b993b49bf82b1fbff20a588876150 --arg amount_kelvin=50000000 --arg deadline_ms=1794895730663 --arg kind=2 --arg target=cli/cli#7
+Invoked add_milestone on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: 3UnqNLfcfQSv64ZCidwgo5MZMN2j2gpNjPGXTKvNeL3cnzZgzqJEfuMqJ81bcwhX9QhUjRe1GCkNMvRaNzGzHEqY
+   on-chain: Status: Success
+-- [hs-deployer] invoke --function fund --arg workflow_pda_slug=100155db6477eef0ceefd8d686f7e254b80b993b49bf82b1fbff20a588876150
+Invoked fund on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: 2bAPUGn6Lhpw6pT8EmCx1o5XJmSZDURkcpHiPmY9z8oJdNiS838cFCqCLwhpYTXqndo5EGXVU7zusNKggPWnpRLE
+   on-chain: Status: Success
+
+######## B: early approval
+-- [hs-deployer] invoke --function create --rex-bytecode-account 7pycwurxgfQMaTN9KMbHqn8vCcBzgZhJKvB4epLyjpH3 --arg workflow_pda_slug=b26595acf2d52a73b49cc6fd335618afb3dd60e93907ae6ee878c71ae60064dd --arg payee=25nhLT1dQkgrzZsEB7o5KNc3sw2tZWtLtBtxQSwB2m8V
+Invoked create on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: 5iVdn7Ta11ourc63zwmbQZjWCrNjZ1cVWPWUHAVgaTQpc8Ny3KqVRhZcwcDC9PVxVPyqM2rDk6dniscTYVTYXBKn
+   on-chain: Status: Success
+-- [hs-deployer] invoke --function add_milestone --arg workflow_pda_slug=b26595acf2d52a73b49cc6fd335618afb3dd60e93907ae6ee878c71ae60064dd --arg amount_kelvin=30000000 --arg deadline_ms=1794896468957 --arg kind=1 --arg target=Siriron/handshake-rialo@v9.9.9
+Invoked add_milestone on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: 2SM67oP85iLWgbpBAbMRiY9CZYX23w3kMadQjR9yxwsEM5EewhTfXmyDT2e3znY4ZEQ5ZqqM2jPvRubMm94Ga5GW
+   on-chain: Status: Success
+-- [hs-deployer] invoke --function fund --arg workflow_pda_slug=b26595acf2d52a73b49cc6fd335618afb3dd60e93907ae6ee878c71ae60064dd
+Invoked fund on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: dgt7Tq8Eh2FrhqV9dg6gLQaADJXA7pYaQhkmgWvNHLAs9xDq9PZaJtikhryQECCH5H8PJdhUvyg4xHtAN6qQndF
+   on-chain: Status: Success
+-- [hs-deployer] invoke --function approve --arg workflow_pda_slug=b26595acf2d52a73b49cc6fd335618afb3dd60e93907ae6ee878c71ae60064dd --arg index=0
+Invoked approve on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: 3YFh5tcU2GC2ZXXLLDX31VVUryum7oYcDeeS7QF33CJvZmVFDvVW7VfgXPCz28nMhVjYhtf5kxGrRQH9DegFUSbJ
+   on-chain: Status: Success
+
+######## D: release verifier
+-- [hs-deployer] invoke --function create --rex-bytecode-account 7pycwurxgfQMaTN9KMbHqn8vCcBzgZhJKvB4epLyjpH3 --arg workflow_pda_slug=c1e8a5308e3e139c98b67fdcc13252bc3136449ce5ad9c264400aaae6da4b1dc --arg payee=9soZLP5h4CcE33CUFcbWw6LP8WLUD95MQPoh5Fkz5VQK
+Invoked create on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: 2Tyw6nvXJqjG4Z1EyE3YM7wPyTM1kDKs4sEhMa7zu7y1UpwbWVzFajS7nSRiWU5db2vRNBVyo9FH9D5L87R5pmhq
+   on-chain: Status: Success
+-- [hs-deployer] invoke --function add_milestone --arg workflow_pda_slug=c1e8a5308e3e139c98b67fdcc13252bc3136449ce5ad9c264400aaae6da4b1dc --arg amount_kelvin=50000000 --arg deadline_ms=1794895686664 --arg kind=1 --arg target=Siriron/handshake-rialo@v0.1.0
+Invoked add_milestone on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: 315uaD92P9tGU9CRAZgT15rf9qYLt5rKaDB7RvaGEJ1KssQosV5sbenfzRis46Tc3PYUFgyincdwQKcAmHXEMf9t
+   on-chain: Status: Success
+-- [hs-deployer] invoke --function add_milestone --arg workflow_pda_slug=c1e8a5308e3e139c98b67fdcc13252bc3136449ce5ad9c264400aaae6da4b1dc --arg amount_kelvin=50000000 --arg deadline_ms=1794895756664 --arg kind=1 --arg target=Siriron/handshake-rialo@v9.9.9
+Invoked add_milestone on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: 2X3995GYeTBt1vDq17idfQVq25cdmu9rTETVu9ZZLu4U2xpuHSSPNf29hyjMW3HkQ2zbDqTZ9rZnM5kvP5sec5Zm
+   on-chain: Status: Success
+-- [hs-deployer] invoke --function fund --arg workflow_pda_slug=c1e8a5308e3e139c98b67fdcc13252bc3136449ce5ad9c264400aaae6da4b1dc
+Invoked fund on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: 4rbT71BaVMqtjRBnCeFVQNgYBgZ5ehDxGLVc6CFB7AtxXrBV7wPy3vjzETMRd4mcunjHf6sk13a8scaRncgY8JJT
+   on-chain: Status: Success
+
+######## C: adversarial calls
+-- [hs-deployer] invoke --function create --rex-bytecode-account 7pycwurxgfQMaTN9KMbHqn8vCcBzgZhJKvB4epLyjpH3 --arg workflow_pda_slug=cf5536eb2532afd48599d40c95f511c388842a57a1fb8102d71c07ff31c9e53a --arg payee=4guBY27Q9m4UJn9gQTTP4mfMrqTeALWGwGUR4Lwwc1Mu
+Invoked create on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: 2Dzr8ub8C8osH7yWpJAApjeCX7kThquo8Zwwwec16cUCizn8Ad6SVmMTgWfx9pCMaimuWrNCkvjqt7EdTHCneWBs
+   on-chain: Status: Success
+-- [hs-deployer] invoke --function add_milestone --arg workflow_pda_slug=cf5536eb2532afd48599d40c95f511c388842a57a1fb8102d71c07ff31c9e53a --arg amount_kelvin=40000000 --arg deadline_ms=1794895715512 --arg kind=1 --arg target=Siriron/handshake-rialo@v0.1.0
+Invoked add_milestone on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: 2QFKvS5RW4dJ64d7tJ5sB1o9Tnh4isDGmX3t5UAxSnKjD3waFswKiGzfK54aRYf8SYgUQaqjJf4dSqmigY74C4jt
+   on-chain: Status: Success
+-- [hs-deployer] invoke --function fund --arg workflow_pda_slug=cf5536eb2532afd48599d40c95f511c388842a57a1fb8102d71c07ff31c9e53a
+Invoked fund on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: 31dkLwEM7PkrxPZx1CurK5joKQt9vUJsdpbQG5PkPT6kftfwAST3hKdFq8cHdDDuPzLJy5koJaET2SJeUNgrBT3d
+   on-chain: Status: Success
+seller C balance before attacks: 1
+-- C1: the seller tries to approve the buyer's milestone
+-- [hs-sc] invoke --function approve --arg workflow_pda_slug=cf5536eb2532afd48599d40c95f511c388842a57a1fb8102d71c07ff31c9e53a --arg index=0
+Invoked approve on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: 3eh9JU29ab8f8pkheaJnU4K1JokyoKCng2MWu6bjPv6nQoSLskaqaFzdbYrcBsjyDRvHrBgC2UDyqErR1eRFURBB
+   on-chain: Status: Failed - {"InstructionError":[0,"InvalidAccountData"]}
+-- C3: the buyer tries to re-create the funded deal with the same slug
+-- [hs-deployer] invoke --function create --rex-bytecode-account 7pycwurxgfQMaTN9KMbHqn8vCcBzgZhJKvB4epLyjpH3 --arg workflow_pda_slug=cf5536eb2532afd48599d40c95f511c388842a57a1fb8102d71c07ff31c9e53a --arg payee=4guBY27Q9m4UJn9gQTTP4mfMrqTeALWGwGUR4Lwwc1Mu
+Invoked create on 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h
+Transaction: 5e2ov7Bs22GQjFGQiUaT9ahsZHHBtKzeuUeaz5nEQ1r4gZNZeer7Ssgzpc9pUeYW2Z3eBcHwrByQq72KY6haYKym
+   on-chain: Status: Failed - {"InstructionError":[0,"InvalidAccountData"]}
+
+== waiting for deadlines and checks
+t=06:07:05 A=0 B=0.03 C=1 D=0
+t=06:07:35 A=0 B=0.03 C=1 D=0
+t=06:08:05 A=0.05 B=0.03 C=1 D=0
+t=06:08:38 A=0.05 B=0.03 C=1 D=0.05
+t=06:09:10 A=0.05 B=0.03 C=1.04 D=0.05
+t=06:09:44 A=0.05 B=0.03 C=1.04 D=0.05
+t=06:10:17 A=0.05 B=0.03 C=1.04 D=0.05
+t=06:10:47 A=0.05 B=0.03 C=1.04 D=0.05
+t=06:11:19 A=0.05 B=0.03 C=1.04 D=0.05
+
+==================== SUMMARY
+RESULT A pull-request verifier: PASS (seller +0.05; merged PR paid, unmerged PR refunded)
+RESULT D release verifier: PASS (seller +0.05; published release paid, missing tag refunded)
+RESULT B early approval: PASS (seller +0.03)
+RESULT C1 seller cannot approve the buyer's deal: PASS (tx 3eh9JU29ab8f8pkheaJnU4K1JokyoKCng2MWu6bjPv6nQoSLskaqaFzdbYrcBsjyDRvHrBgC2UDyqErR1eRFURBB failed on chain)
+RESULT C3 buyer cannot re-create a funded deal: PASS (tx 5e2ov7Bs22GQjFGQiUaT9ahsZHHBtKzeuUeaz5nEQ1r4gZNZeer7Ssgzpc9pUeYW2Z3eBcHwrByQq72KY6haYKym failed on chain)
+RESULT C deal still settled once after attacks: PASS (seller 1 -> 1.04, expected about +0.04)
