@@ -83,6 +83,25 @@ Failed transactions cost 0 kelvin. Program logs for A:
     handshake on_check milestone 1: 4 updates, verdict 2
     handshake: validators agree milestone 1 was not met
 
+## Regression on the audited build (run 44028572250, commit e8a86ef)
+After the code audit below, the program was redeployed in place and all scenarios
+were run again, now including a release-verifier deal (D) and four deals at once
+from one buyer. Every setup transaction was confirmed before the next; none failed.
+
+    RESULT A pull-request verifier: PASS (seller +0.05; merged PR paid, unmerged PR refunded)
+    RESULT D release verifier: PASS (seller +0.05; published release paid, missing tag refunded)
+    RESULT B early approval: PASS (seller +0.03)
+    RESULT C1 seller cannot approve the buyer's deal: PASS (failed on chain)
+    RESULT C3 buyer cannot re-create a funded deal: PASS (failed on chain)
+    RESULT C deal still settled once after attacks: PASS (seller 1 -> 1.04)
+
+Failed attack transactions: C1 `3eh9JU29ab8f8pkheaJnU4K1JokyoKCng2MWu6bjPv6nQoSLskaqaFzdbYrcBsjyDRvHrBgC2UDyqErR1eRFURBB`,
+C3 `5e2ov7Bs22GQjFGQiUaT9ahsZHHBtKzeuUeaz5nEQ1r4gZNZeer7Ssgzpc9pUeYW2Z3eBcHwrByQq72KY6haYKym`.
+The signatures for the payouts in the table above come from the earlier run of
+the same scenarios; the later run is recorded by its pass lines and run id (the
+raw log of the latest run is on the `scenario-results` branch until it is
+overwritten by the next run).
+
 ## Defects found by testing, and fixed
 1. **`approve` silently killed the heartbeat.** The first version armed a timer
    from the control call. All control calls run in "branch 0", so that timer used
@@ -104,12 +123,41 @@ Failed transactions cost 0 kelvin. Program logs for A:
    `expire_check` re-verifies its own timeout. These are deployed and unit
    tested; the forged-argument case itself has not been sent on chain.
 
+4. **A failing check could retry forever.** Attempts used to be counted inside
+   `run_check`, so a check that kept failing (for example a buyer who drained the
+   wallet that pays for REX) reverted its own counter and never ran out of
+   attempts, locking the funds. Attempts are now counted when the heartbeat arms
+   them, with a separate count of attempts actually started. Found by code review
+   and covered by a simulation of a dead check pipeline; not sent on devnet.
+5. **An approved milestone could be refunded.** If a milestone was both approved
+   and stuck, the payout and the expiry could be armed on the same tick and the
+   expiry could win. The heartbeat now acts in strict priority (approved, stuck,
+   due), and `expire_check` ignores approved milestones.
+6. **Dust and stale funding.** A tiny milestone paid to a brand-new account would
+   fail at the runtime and end in a refund; amounts below 0.01 RLO are refused. A
+   deal could be funded after its first deadline into an instant check; `fund`
+   now requires the first deadline to be ahead.
+7. **Escrow-account identity was assumed.** Deposits and payouts trusted the
+   account at a fixed position to be the deal's escrow account; they now verify
+   its address. Payees equal to the escrow account, the program or the zero
+   address are refused.
+8. **Looser target rules in the verifier than in the core.** The REX function
+   allowed targets (`..`, a leading dot) that the core rejects. The rules now
+   match, and 64-bit indexes are checked before narrowing to the 32-bit target's
+   `usize`.
+9. **Workflow hygiene.** Secrets were exposed to every step, a failed deploy
+   reported success, and CI ran the code under test with a write-capable token.
+   Keys are scoped to one step, deploys verify the stored keys and the reported
+   addresses and fail loudly, devnet jobs run one at a time, third-party actions
+   are pinned to commits, and CI gained format and clippy gates.
+
 ## Not yet verified on devnet
 - Calling a handler directly with a hand-built transaction. The CLI manifest only
   exposes `create`, `add_milestone`, `fund` and `approve`, so handlers cannot be
   invoked from the CLI; I have no evidence either way about raw transactions.
 - A forged `report` argument to `on_check`, and `expire_check` called early:
   covered by unit tests of the decision logic and by code review only.
-- The stuck-check rescue (a check whose report never arrives): unit tests only;
-  it has never triggered on chain.
+- The stuck-check rescue (a check whose report never arrives) and a check
+  pipeline that fails every time: unit tests and a simulation only; neither has
+  triggered on chain.
 - Deals longer than a few minutes.

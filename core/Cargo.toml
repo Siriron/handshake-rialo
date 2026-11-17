@@ -4,4 +4,6 @@ version = "0.1.0"
 edition = "2021"
 description = "Pure logic for Handshake: input validation, report classification, settlement accounting"
 license = "Apache-2.0"
+repository = "https://github.com/Siriron/handshake-rialo"
+rust-version = "1.90"
 publish = false

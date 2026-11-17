@@ -1,7 +1,7 @@
 # Handshake threat model
 
 Status: matches the code in this repo. "Tested" means covered by
-`cargo test -p handshake-core` (22 tests). "Devnet" means observed on Rialo
+`cargo test` in `core/` (23 tests). "Devnet" means observed on Rialo
 devnet; see [`EVIDENCE.md`](EVIDENCE.md) for signatures. "Review" means checked
 by reading the code only.
 
@@ -56,6 +56,15 @@ avoid paying; a seller cannot touch the deal at all.
 | Look-alike verifier substituted | the program pins the REX component address at create and at every check | devnet (every check ran against the pinned address) |
 | Payee is a program account that cannot be credited | milestone is refunded instead of stuck | review |
 | A second timer armed from a control call replaces the heartbeat | only `fund` arms a timer from a control call; `approve` records state and the heartbeat acts on it | found and fixed on devnet |
+| A stalled check locks funds forever (a check that keeps failing, for example a buyer who drained the wallet that pays for REX) | check attempts are counted when the heartbeat arms them, so the budget is spent even if the check itself fails; after the last attempt a timeout triggers a refund | tested (simulation of a dead check pipeline); not sent on devnet |
+| Direct caller runs extra REX attempts to orphan the real report | a separate count of consumed attempts; a run is only allowed when an armed attempt is outstanding | tested |
+| An approved milestone is refunded by the expiry path | the heartbeat acts in strict priority (approved, then stuck, then due) and `expire_check` ignores approved milestones | review; devnet (approvals paid correctly) |
+| Dust milestone that cannot be credited to a new account | minimum amount of 0.01 RLO | tested |
+| Deal funded after its first deadline into an instant check | `fund` requires the first deadline to be ahead | tested; devnet (every funded deal) |
+| Payee set to the escrow account, the program, or the zero address | refused at `create` | review |
+| A different program-owned account passed where the escrow account is expected | deposits and payouts require the account to be the deal's own derived escrow account | review; devnet (every deposit and payout) |
+| Index values that truncate when converted for the 32-bit target | every handler checks the 64-bit index against 4 before converting | review |
+| Secrets exposed to third-party actions in CI | keys are scoped to the single step that needs them; actions are pinned to commits; credentials are not persisted by checkout; devnet workflows are manual and serialised | review |
 
 ## Known gaps
 - No disputes, arbiters, partial payouts, tokens, or fees.
@@ -65,5 +74,12 @@ avoid paying; a seller cannot touch the deal at all.
   validators share egress IPs, checks can come back inconclusive.
 - REX fees and rent fall on the workflow payer (the buyer): about 0.03 RLO for a
   two-milestone deal on devnet.
-- Direct handler calls with raw transactions, the stuck-check rescue, and long
-  deals have not been exercised on devnet.
+- Direct handler calls with raw transactions, the stuck-check rescue, a check
+  pipeline that fails every time, and long deals have not been exercised on
+  devnet.
+- Liveness rests on the heartbeat: if a timer transaction ever failed outright, a
+  deal would stall with its funds locked. None has been observed.
+- The buyer chooses the payee and the targets, and a seller has no on-chain way to
+  accept terms. A seller must read the deal before doing work.
+- The Rialo installer is fetched without a published checksum in the devnet
+  workflows (devnet keys only, manual runs only).

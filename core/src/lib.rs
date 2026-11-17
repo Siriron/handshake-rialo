@@ -2,6 +2,8 @@
 //! they can be tested exhaustively on a normal machine. The Venus program
 //! calls these functions for every decision that moves money.
 
+#![forbid(unsafe_code)]
+
 pub const MAX_MILESTONES: usize = 4;
 /// Smallest milestone amount (kelvin; 1 RLO = 1e9 kelvin). Paying a brand-new
 /// account less than the rent-exempt minimum fails at the runtime, which would

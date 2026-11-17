@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 description = "Handshake: milestone escrow on Rialo. Validators verify real-world evidence; funds pay out or refund themselves."
 license = "Apache-2.0"
+repository = "https://github.com/Siriron/handshake-rialo"
+rust-version = "1.90"
 publish = false
 
 [lib]
