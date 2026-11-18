@@ -79,6 +79,10 @@ avoid paying; a seller cannot touch the deal at all.
   devnet.
 - Liveness rests on the heartbeat: if a timer transaction ever failed outright, a
   deal would stall with its funds locked. None has been observed.
+- An approved milestone takes priority over the expiry path. If its payout
+  transaction ever failed repeatedly it would not fall back to a refund. No cause
+  is known: the payee checks, the minimum amount and the executable-account
+  fallback make a failing payout unreachable in practice.
 - The buyer chooses the payee and the targets, and a seller has no on-chain way to
   accept terms. A seller must read the deal before doing work.
 - The Rialo installer is fetched without a published checksum in the devnet
