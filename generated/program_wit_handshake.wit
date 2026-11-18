@@ -1,0 +1,10 @@
+package rialo:handshake@0.1.0;
+
+use rialo:primitives@0.1.0.{pubkey, lamports, timestamp, error};
+
+world handshake {
+    export create: func(payee: pubkey, rex-bytecode-account: pubkey) -> result<_, error>;
+    export add-milestone: func(amount-kelvin: u64, deadline-ms: u64, kind: u64, target: string) -> result<_, error>;
+    export fund: func() -> result<_, error>;
+    export approve: func(index: u64) -> result<_, error>;
+}

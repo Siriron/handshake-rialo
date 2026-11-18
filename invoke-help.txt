@@ -1,0 +1,162 @@
+Invoke a function on a deployed Venus program using its manifest.
+
+The manifest is loaded from `--manifest <path>` or auto-discovered as
+`<program-dir>/wit/*-manifest.json` when `--program-dir` is given. Argument types are inferred from
+the manifest's parameter spec.
+
+In any Venus workflow that contains `rex {}` blocks, the macro declares a `__rex_bytecode_account`
+parameter on every initiating function. `--rex-bytecode-account <PUBKEY>` is a friendly shorthand
+for `--arg __rex_bytecode_account=<PUBKEY>`. Passing both forms is rejected with a mutual-exclusion
+error.
+
+Usage: rialo client program invoke [OPTIONS] --function <FUNCTION> <PROGRAM_ID>
+
+Arguments:
+  <PROGRAM_ID>
+          The deployed program ID
+
+Options:
+      --manifest <MANIFEST>
+          Path to the Venus manifest JSON
+
+      --program-dir <PROGRAM_DIR>
+          Program directory containing `wit/<program>-manifest.json`
+
+      --function <FUNCTION>
+          Function name as declared in the manifest's `instructions` map
+
+      --arg <ARGS>
+          Repeated `key=value`. Types are inferred from the manifest. Special value `random` for
+          `nonce` parameters generates a fresh 32-byte slug
+
+      --rex-bytecode-account <REX_BYTECODE_ACCOUNT>
+          Convenience flag for the `__rex_bytecode_account` parameter declared by every Venus
+          initiating function in workflows that contain `rex {}` blocks. Equivalent to `--arg
+          __rex_bytecode_account=<PUBKEY>`; mutually exclusive with passing the verbose form via
+          `--arg`
+
+  -n, --network <NETWORK>
+          Network name to connect to (localnet, devnet, testnet)
+          
+          This is a convenience option that resolves to a predefined network configuration. If both
+          --network and --url are provided, --url takes precedence.
+
+  -u, --url <RPC_URL>
+          URL of the Rialo node to connect to for API requests
+          
+          Defaults to "http://127.0.0.1:4104" This flag overrides any network setting.
+
+  -v, --verbose...
+          Verbosity level, can be repeated to increase verbosity This is a global flag, so it can be
+          used with any command
+
+      --format <FORMAT>
+          Output format for command results
+          
+          [default: human]
+          [possible values: human, json]
+
+      --json
+          Output results in JSON format (shorthand for --format=json)
+
+      --config-overrides <CONFIG_OVERRIDES>
+          Configuration overrides in the format key=value (can be used multiple times) Examples:
+          --config network=testnet --config database.host=localhost
+
+      --danger-accept-invalid-certs
+          Accept invalid TLS certificates (DANGEROUS - only use for testing) By default, certificate
+          validation is enabled except for localhost connections
+
+      --silent
+          Silent mode: suppress all output to stdout and stderr Useful for CI/CD environments and
+          scripting
+
+      --no-setup
+          Skip first-run setup and onboarding Useful for CI/CD environments and automated testing
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+Invoke a function on a deployed Venus program using its manifest.
+
+The manifest is loaded from `--manifest <path>` or auto-discovered as
+`<program-dir>/wit/*-manifest.json` when `--program-dir` is given. Argument types are inferred from
+the manifest's parameter spec.
+
+In any Venus workflow that contains `rex {}` blocks, the macro declares a `__rex_bytecode_account`
+parameter on every initiating function. `--rex-bytecode-account <PUBKEY>` is a friendly shorthand
+for `--arg __rex_bytecode_account=<PUBKEY>`. Passing both forms is rejected with a mutual-exclusion
+error.
+
+Usage: rialo client program invoke [OPTIONS] --function <FUNCTION> <PROGRAM_ID>
+
+Arguments:
+  <PROGRAM_ID>
+          The deployed program ID
+
+Options:
+      --manifest <MANIFEST>
+          Path to the Venus manifest JSON
+
+      --program-dir <PROGRAM_DIR>
+          Program directory containing `wit/<program>-manifest.json`
+
+      --function <FUNCTION>
+          Function name as declared in the manifest's `instructions` map
+
+      --arg <ARGS>
+          Repeated `key=value`. Types are inferred from the manifest. Special value `random` for
+          `nonce` parameters generates a fresh 32-byte slug
+
+      --rex-bytecode-account <REX_BYTECODE_ACCOUNT>
+          Convenience flag for the `__rex_bytecode_account` parameter declared by every Venus
+          initiating function in workflows that contain `rex {}` blocks. Equivalent to `--arg
+          __rex_bytecode_account=<PUBKEY>`; mutually exclusive with passing the verbose form via
+          `--arg`
+
+  -n, --network <NETWORK>
+          Network name to connect to (localnet, devnet, testnet)
+          
+          This is a convenience option that resolves to a predefined network configuration. If both
+          --network and --url are provided, --url takes precedence.
+
+  -u, --url <RPC_URL>
+          URL of the Rialo node to connect to for API requests
+          
+          Defaults to "http://127.0.0.1:4104" This flag overrides any network setting.
+
+  -v, --verbose...
+          Verbosity level, can be repeated to increase verbosity This is a global flag, so it can be
+          used with any command
+
+      --format <FORMAT>
+          Output format for command results
+          
+          [default: human]
+          [possible values: human, json]
+
+      --json
+          Output results in JSON format (shorthand for --format=json)
+
+      --config-overrides <CONFIG_OVERRIDES>
+          Configuration overrides in the format key=value (can be used multiple times) Examples:
+          --config network=testnet --config database.host=localhost
+
+      --danger-accept-invalid-certs
+          Accept invalid TLS certificates (DANGEROUS - only use for testing) By default, certificate
+          validation is enabled except for localhost connections
+
+      --silent
+          Silent mode: suppress all output to stdout and stderr Useful for CI/CD environments and
+          scripting
+
+      --no-setup
+          Skip first-run setup and onboarding Useful for CI/CD environments and automated testing
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version

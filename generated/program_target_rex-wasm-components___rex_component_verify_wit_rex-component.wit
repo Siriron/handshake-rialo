@@ -1,0 +1,139 @@
+// Copyright (c) Subzero Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+// WIT interface for Rialo WASM Component-based REX Programs
+//
+// This defines the contract between the rex host (Rust) and WASM components
+// that implement custom rex logic with WebSocket support.
+
+package rialo:rex-component@0.1.0;
+
+/// Rex execution interface
+interface rex {
+    /// Main entry point for the rex component.
+    ///
+    /// The component receives binary input (e.g. bincode-serialized arguments) and
+    /// returns the computation result as a UTF-8 string. Errors are returned as
+    /// string descriptions.
+    execute: func(input: list<u8>) -> result<string, string>;
+}
+
+/// WebSocket capability provided by the host
+interface websocket {
+    /// WebSocket connection handle (resource ID)
+    type connection = u32;
+    
+    /// WebSocket message with type indicator
+    record message {
+        data: list<u8>,
+        is-binary: bool,
+    }
+    
+    /// Connect to a WebSocket URL
+    /// 
+    /// Returns a connection handle on success, or error description on failure.
+    /// The host manages connection lifecycle and limits the number of concurrent connections.
+    connect: func(url: string) -> result<connection, string>;
+    
+    /// Send a message over the WebSocket connection
+    /// 
+    /// - conn: The connection handle
+    /// - data: Message payload (bytes)
+    /// - is-binary: true for binary frames, false for text frames
+    send: func(conn: connection, data: list<u8>, is-binary: bool) -> result<_, string>;
+    
+    /// Receive a message with timeout
+    /// 
+    /// - conn: The connection handle
+    /// - timeout-ms: Maximum time to wait for a message (milliseconds)
+    /// 
+    /// Returns the received message or an error if timeout/connection failure occurs.
+    receive: func(conn: connection, timeout-ms: u32) -> result<message, string>;
+    
+    /// Close the WebSocket connection gracefully
+    /// 
+    /// Sends a Close frame and releases the connection resource.
+    close: func(conn: connection) -> result<_, string>;
+}
+
+/// HTTP capability provided by the host
+interface http {
+    /// HTTP response
+    record http-response {
+        status: u16,
+        headers: list<tuple<string, string>>,
+        body: list<u8>,
+    }
+
+    /// HTTP request method.
+    ///
+    /// The same SSRF / no-redirect / size / timeout guards apply uniformly to
+    /// every method.
+    enum http-method {
+        get,
+        post,
+        put,
+        patch,
+        delete,
+        head,
+        options,
+    }
+
+    /// Perform an HTTP GET request
+    ///
+    /// - url: Target URL (HTTPS required in production)
+    /// - headers: List of (name, value) header pairs
+    /// - timeout-ms: Maximum time to wait (milliseconds)
+    get: func(url: string, headers: list<tuple<string, string>>, timeout-ms: u32) -> result<http-response, string>;
+
+    /// Perform an HTTP POST request
+    ///
+    /// - url: Target URL (HTTPS required in production)
+    /// - headers: List of (name, value) header pairs
+    /// - body: Request body bytes
+    /// - timeout-ms: Maximum time to wait (milliseconds)
+    post: func(url: string, headers: list<tuple<string, string>>, body: list<u8>, timeout-ms: u32) -> result<http-response, string>;
+
+    /// Perform an HTTP request with an arbitrary method.
+    ///
+    /// Supports GET / POST / PUT / PATCH / DELETE / HEAD / OPTIONS so that
+    /// upstream APIs requiring methods beyond GET/POST can be proxied.
+    ///
+    /// - method: HTTP method to use
+    /// - url: Target URL (HTTPS required in production)
+    /// - headers: List of (name, value) header pairs
+    /// - body: Optional request body bytes (use `none` for methods without a body)
+    /// - timeout-ms: Maximum time to wait (milliseconds)
+    request: func(method: http-method, url: string, headers: list<tuple<string, string>>, body: option<list<u8>>, timeout-ms: u32) -> result<http-response, string>;
+}
+
+/// Time capability provided by the host
+interface time {
+    /// Get current unix timestamp in seconds from NIST NTP servers.
+    now: func() -> result<s64, string>;
+}
+
+/// Logging capability provided by the host
+interface logging {
+    /// Log levels
+    enum log-level {
+        trace,
+        debug,
+        info,
+        warn,
+        error,
+    }
+
+    /// Emit a log message (may be redacted in production builds)
+    log: func(level: log-level, message: string);
+}
+
+/// World definition for WASM rex components
+world rex-world {
+    import websocket;
+    import http;
+    import time;
+    import logging;
+
+    export rex;
+}

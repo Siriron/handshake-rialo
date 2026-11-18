@@ -1,0 +1,8 @@
+Transaction fee: 0 kelvins
+Status: Success
+Log messages:
+  1: Program 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h invoke [1]
+  2: Program log: workflow branch number: 0
+  3: Program log: Continue workflow
+  4: Program 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h consumed 19327 of 200000 compute units
+  5: Program 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h success

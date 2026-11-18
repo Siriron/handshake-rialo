@@ -1,0 +1,162 @@
+Rialo client commands for interacting with the network. This includes wallet operations, program
+deployment, subscriptions, and rex management
+
+Usage: rialo client [OPTIONS] <COMMAND>
+
+Commands:
+  airdrop                          Request an airdrop of RLO tokens to a specified address. If no
+                                   address is provided, defaults to the current keypair's address.
+                                   If no faucet URL is provided, it will be inferred from the RPC
+                                   URL
+  balance                          Display the RLO balance of a specified address. Shows the current
+                                   kelvin balance converted to RLO units. If no address is provided,
+                                   shows the balance of the current keypair
+  account                          Display detailed account information for a specified address.
+                                   Shows account balance, owner, data length, and other metadata
+  transfer                         Transfer RLO tokens from one account to another. Sends the
+                                   specified amount of RLO to the target address. Can optionally
+                                   specify a custom sender keypair file
+  get-block-height                 Retrieve and display the current block height from the network.
+                                   Shows the number of blocks that have been produced since genesis.
+                                   Always returns the finalized block height
+  rent-exemption                   Calculate the minimum balance required for rent exemption. Shows
+                                   how much RLO is needed to make an account rent-exempt for a given
+                                   data size. If no size is provided, uses a default size for
+                                   estimation
+  transaction                      Retrieve and display detailed information about a transaction.
+                                   Shows transaction status, fees, logs, and account changes
+  get-transactions                 Query recent transactions from the blockchain with pagination.
+                                   Shows a list of recent transaction signatures and metadata
+  rex                              REX management commands for creating, listing, and controlling
+                                   REX requests. Manage rex lifecycle including creation,
+                                   activation/deactivation, and querying
+  set-number                       Set a number value in the test event system. This is primarily
+                                   used for testing event emission and subscription functionality.
+                                   Creates a new account to store the number value
+  subscribe-to-set-number          Subscribe to SetNumber events with a custom handler. When a
+                                   SetNumber event is emitted, the specified handler will be
+                                   executed
+  subscribe-to-rex-report          Subscribe to rex report events with a custom handler. When an
+                                   RexReportEvent is emitted for the specified rex, the handler will
+                                   be executed. Use this to react to rex data updates without
+                                   aggregator programs
+  get-subscription                 Get a subscription for a given subscriber and nonce
+  get-triggered-transactions       Get triggered transactions for a subscription. Returns a list of
+                                   transactions that were triggered by the subscription
+  create-subscription              Create subscription according to the specified conditions. This
+                                   command allows users to set up subscriptions for various events.
+                                   Note the `instruction_path` should point to a valid JSON file of
+                                   type rialo_s_sdk::instruction::Instruction
+  cancel-subscription              Cancel subscription for the specified subscriber and nonce. On
+                                   success, the subscription is cancelled; otherwise an error is
+                                   returned
+  get-workflow-lineage             Retrieve and display the workflow lineage for a transaction.
+                                   Shows the tree of transactions that were triggered by the initial
+                                   transaction through event subscriptions, including subscription
+                                   details and trigger information
+  get-secret-sharing-pubkey        Retrieve the current threshold public key used for secret sharing
+  encrypt-secret                   Encrypt a secret value for use in rex HTTP headers via DKG
+                                   threshold decryption. Creates an encrypted value that can be used
+                                   as an encrypted header value, which will be threshold-decrypted
+                                   during rex execution
+  program                          Program deployment and management commands. Deploy compiled
+                                   programs to the Rialo network using the Loader V4 system. Handles
+                                   the multi-step process of buffer creation, data upload, and
+                                   finalization
+  create-http-get-rex              Create an REX Request for an HTTP GET using the event-based
+                                   pattern. Sends a request to the specified URL and emits an
+                                   RexReportEvent. Subscribe to `rex_report:{rex_id}` to receive
+                                   updates
+  create-http-post-rex             Create an REX Request for an HTTP POST using the event-based
+                                   pattern. Sends a request to the specified URL and emits an
+                                   RexReportEvent. Subscribe to `rex_report:{rex_id}` to receive
+                                   updates
+  timer                            Manage a repeating timer program instance
+  recurring-payment                Manage a recurring payment program instance
+  token2022                        Interact with Token-2022 program
+  ws-stocks                        Commands for interacting with the WebSocket stocks tracker
+                                   program
+  submit-epoch-change              Submit epoch change
+  features                         Manage blockchain features with time-based activation. Query
+                                   feature status or manage features with authorized keypair
+  stake                            Native staking operations: create, delegate, deactivate, and
+                                   withdraw
+  init-committee                   Initialize the DKG committee on-chain. Reads the BLS12-381
+                                   authority public key from each validator directory and creates a
+                                   committee with the given threshold. Participant indices are
+                                   assigned in the order validators are provided (1-based)
+  update-committee                 Update committee membership (add/remove validators)
+  init-dkg-genesis                 Initialize the DKG genesis ceremony on-chain. Starts the
+                                   multi-step DKG ceremony. After this instruction is processed, all
+                                   committee validators' CryptoService instances will automatically
+                                   begin posting their contributions
+  init-dkg-reshare                 Initialize a DKG resharing ceremony on-chain. Refreshes committee
+                                   members' shares while preserving the joint public key. Requires a
+                                   completed genesis ceremony with an active DKG key
+  init-dkg-committee-swap-reshare  Initialize a one-shot DKG committee-swap resharing ceremony
+                                   on-chain. The current committee keeps serving while the supplied
+                                   validators receive fresh shares; finalization promotes them as
+                                   the active committee
+  abort-dkg                        Abort the active DKG ceremony on-chain. Transitions a stuck
+                                   non-terminal ceremony to Failed so the operator can start a fresh
+                                   genesis or resharing ceremony
+  finalize-dkg                     Finalize the DKG ceremony on-chain. Aggregates all dealer
+                                   contributions and publishes the joint public key. Must be called
+                                   after all committee members have acknowledged their shares
+  get-dkg-pubkey                   Retrieve the current threshold public key from on-chain state
+  dkg-status                       Report the on-chain state of the crypto-service registry in
+                                   structured form (committee initialized? ceremony in progress and
+                                   at what stage? joint public key set?). Intended for idempotent
+                                   deployment scripts so they can decide whether to re-run
+                                   `init-committee`, `init-dkg-genesis`, or `finalize-dkg`. Unlike
+                                   `get-dkg-pubkey`, this does not error when the chain is pristine
+                                   — it returns a well-formed "empty" response
+  dkg-encrypt                      Encrypt a secret using the active threshold public key. The
+                                   output can be used as the body of an encrypted REX request
+  help                             Print this message or the help of the given subcommand(s)
+
+Options:
+  -n, --network <NETWORK>
+          Network name to connect to (localnet, devnet, testnet)
+          
+          This is a convenience option that resolves to a predefined network configuration. If both
+          --network and --url are provided, --url takes precedence.
+
+  -u, --url <RPC_URL>
+          URL of the Rialo node to connect to for API requests
+          
+          Defaults to "http://127.0.0.1:4104" This flag overrides any network setting.
+
+  -v, --verbose...
+          Verbosity level, can be repeated to increase verbosity This is a global flag, so it can be
+          used with any command
+
+      --format <FORMAT>
+          Output format for command results
+          
+          [default: human]
+          [possible values: human, json]
+
+      --json
+          Output results in JSON format (shorthand for --format=json)
+
+      --config-overrides <CONFIG_OVERRIDES>
+          Configuration overrides in the format key=value (can be used multiple times) Examples:
+          --config network=testnet --config database.host=localhost
+
+      --danger-accept-invalid-certs
+          Accept invalid TLS certificates (DANGEROUS - only use for testing) By default, certificate
+          validation is enabled except for localhost connections
+
+      --silent
+          Silent mode: suppress all output to stdout and stderr Useful for CI/CD environments and
+          scripting
+
+      --no-setup
+          Skip first-run setup and onboarding Useful for CI/CD environments and automated testing
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version

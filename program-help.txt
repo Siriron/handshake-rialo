@@ -1,0 +1,60 @@
+Program deployment and management commands. Deploy compiled programs to the Rialo network using the
+Loader V4 system. Handles the multi-step process of buffer creation, data upload, and finalization
+
+Usage: rialo client program [OPTIONS] <COMMAND>
+
+Commands:
+  deploy        Deploy a compiled program binary to the Rialo network
+  deploy-venus  Deploy a Venus program (PolkaVM handler plus optional packed REX WASM components)
+                from an already-built program directory. Run `cargo build --manifest-path
+                <program-dir>/artifact/Cargo.toml` first
+  invoke        Invoke a function on a deployed Venus program using its manifest
+  show          Display information about a deployed program. Shows program metadata including
+                authority, deployment slot, status, and data size. Supports RISC-V loader
+  help          Print this message or the help of the given subcommand(s)
+
+Options:
+  -n, --network <NETWORK>
+          Network name to connect to (localnet, devnet, testnet)
+          
+          This is a convenience option that resolves to a predefined network configuration. If both
+          --network and --url are provided, --url takes precedence.
+
+  -u, --url <RPC_URL>
+          URL of the Rialo node to connect to for API requests
+          
+          Defaults to "http://127.0.0.1:4104" This flag overrides any network setting.
+
+  -v, --verbose...
+          Verbosity level, can be repeated to increase verbosity This is a global flag, so it can be
+          used with any command
+
+      --format <FORMAT>
+          Output format for command results
+          
+          [default: human]
+          [possible values: human, json]
+
+      --json
+          Output results in JSON format (shorthand for --format=json)
+
+      --config-overrides <CONFIG_OVERRIDES>
+          Configuration overrides in the format key=value (can be used multiple times) Examples:
+          --config network=testnet --config database.host=localhost
+
+      --danger-accept-invalid-certs
+          Accept invalid TLS certificates (DANGEROUS - only use for testing) By default, certificate
+          validation is enabled except for localhost connections
+
+      --silent
+          Silent mode: suppress all output to stdout and stderr Useful for CI/CD environments and
+          scripting
+
+      --no-setup
+          Skip first-run setup and onboarding Useful for CI/CD environments and automated testing
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version

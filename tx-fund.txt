@@ -1,0 +1,19 @@
+Transaction fee: 0 kelvins
+Status: Success
+Log messages:
+  1: Program 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h invoke [1]
+  2: Program log: workflow branch number: 0
+  3: Program log: Continue workflow
+  4: Program 11111111111111111111111111111111 invoke [2]
+  5: Program 11111111111111111111111111111111 success
+  6: Program Subscriber111111111111111111111111111111111 invoke [2]
+  7: SubscribeToEvent
+  8: Deploying account with 6048240 kelvin for rent exemption
+  9: Program 11111111111111111111111111111111 invoke [3]
+  10: Program 11111111111111111111111111111111 success
+  11: SUBSCRIPTION_AUDIT::SUBSCRIBE::signer=G839F16yx2AyBcQvcX2NoVRmq3U8R5xAAfbn1ngdhDP6::subscription=G89A7ahZintKKuHVzA2GKturjuX5no4AuL1D6D7zGPJW::nonce=[98, 231, 185, 79, 226, 139, 143, 30, 221, 30, 217, 20, 51, 236, 242, 131, 145, 24, 210, 150, 208, 73, 202, 64, 54, 183, 192, 155, 208, 211, 49, 102]::topic=clock::kind=OneShot::active_commits=16545809..=16545909
+  12: rialo_subscribe::G89A7ahZintKKuHVzA2GKturjuX5no4AuL1D6D7zGPJW
+  13: Program Subscriber111111111111111111111111111111111 success
+  14: Program log: handshake funded: 58024680 kelvin over 2 milestones
+  15: Program 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h consumed 30329 of 200000 compute units
+  16: Program 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h success

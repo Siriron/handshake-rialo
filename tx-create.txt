@@ -1,0 +1,13 @@
+Transaction fee: 0 kelvins
+Status: Success
+Log messages:
+  1: Program 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h invoke [1]
+  2: Program log: workflow branch number: 0
+  3: Program log: Begin workflow
+  4: Program log: handshake created for payee BuUruu5dUTrUYbxWo9kbQLuTptEoGDvRpgcTPQRKBBQH
+  5: Program log: Creating workflow account 7XfpdxLcQAhACH14epmavkcoeXCHjsprAiJouACEgXiv with 704 bytes and 5790720 kelvin
+  6: Program 11111111111111111111111111111111 invoke [2]
+  7: Program 11111111111111111111111111111111 success
+  8: Program log: Workflow account 7XfpdxLcQAhACH14epmavkcoeXCHjsprAiJouACEgXiv initialized successfully
+  9: Program 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h consumed 52994 of 200000 compute units
+  10: Program 5umz6vh9vQ85fJhYrUmDMm6pGYVj5Cr5Tv9RS9GfEf2h success
