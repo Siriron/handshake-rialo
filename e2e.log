@@ -1,0 +1,27 @@
+
+> handshake-web@0.1.0 e2e
+> tsx scripts/e2e.ts
+
+00:31:35 rpc http://devnet.rialo.io:4100 buyer 53kUQsTbf4gCZNNLWpw2MK5joZe4b8hDzMrvEmsHKHnM seller 3oNpozgEamNPwcY83mpigoYvP2EHJ1aqBf1uS3Y47UfA
+00:31:39 PASS buyer funded by faucet
+00:31:39 slug a58db320c48186f8e16953dff76bc3da780441b336f496aa2e535073183062b2 deal G9QMxLy6DTQD5GgEg4oR2ij83vVDuQMMPNdHACiwBrKm
+00:31:45 create -> 4enSWxczojnGVVbtPh7rdPwYyBYWZFpjHuiqNy3uAT1umHZdmWRAL3MTJahbAcEu728qnEZ6cft1eDfimwHrexJV
+00:31:45 PASS create
+00:31:49 add_milestone 0 (unmerged PR) -> 2hByHKcfNisy9i4EME1384Kb9vVaymkLRyqTTUcdyNbNw6rLKRPgH7XxnL9f7MtfQpvDNgckhTwsZ1gRutJGB7rv
+00:31:49 PASS add_milestone 0 (unmerged PR)
+00:31:52 add_milestone 1 (release) -> 38EcscEkjDF2xM22mVN7sYtEMYRHTBK94YiA2mUzin37fMHPMERKSzwzVobaFk34NiSXdQMPTwStrDdEheVJAHRX
+00:31:52 PASS add_milestone 1 (release)
+00:31:58 fund -> 3y9eRdWo4QqPzpwVJQvyiNN8zdhLMjH8jbPKkki94QZGuwv2nC4YhJZ8yKa4sXx4P6m2R12K64M5ec7Uqhs2DYa3
+00:31:58 PASS fund
+00:32:01 PASS deal readable and funded
+00:32:02 approve 1 -> 36sd9DZtMBihZeQDDnkwXFgRz5xxPLSiDyepCDdzwi5TSrkKpCBoVPxCuTUmCEpJXCSgAi7sWyQZovVZqiHL9Ndw
+00:32:02 PASS approve
+00:32:02 milestones: funded,funded
+00:32:13 milestones: funded,paid
+00:33:39 milestones: refunded,paid
+00:33:39 PASS approved milestone paid
+00:33:39 PASS unmerged PR milestone refunded
+00:33:39 PASS deal fully settled
+00:33:39 PASS seller received exactly the approved amount
+00:33:40 buyer balance 1000000000 -> 946544800
+E2E PASSED
