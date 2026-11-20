@@ -78,22 +78,30 @@ export function openNewDeal(done?: () => void) {
   const drafts: Draft[] = [{ amount: "", minutes: "", kind: "pr", target: "" }];
   let seller = "", touched = false, busy = false;
   const root = () => inner();
+  const paintErrors = () => {
+    if (!touched) return;
+    const e = validateDraft(seller, wallet?.address ?? null, drafts);
+    root().querySelectorAll<HTMLElement>("[data-e]").forEach((el) => {
+      const [i, f] = el.dataset.e!.split(":");
+      el.textContent = f === undefined ? (e.seller ?? "") : (e[Number(i)]?.find((x) => x.field === f)?.message ?? "");
+    });
+  };
   const render = () => {
     const errs = validateDraft(seller, wallet?.address ?? null, drafts);
     const total = drafts.reduce((n, d) => n + (parseRlo(d.amount) ?? 0n), 0n);
     const fe = (i: number, f: keyof Draft) => (touched ? errs[i]?.find((e) => e.field === f)?.message : undefined);
     const ms = drafts.map((d, i) => `<fieldset class="ms-form" style="margin:0"><div class="actions" style="justify-content:space-between"><legend class="lab" style="padding:0">Milestone ${i + 1}</legend>${drafts.length > 1 ? `<button type="button" class="btn ghost sm" data-rm="${i}">Remove</button>` : ""}</div>
-      <div class="row"><div class="field"><label for="a${i}">Amount (RLO)</label><input id="a${i}" data-f="amount" data-i="${i}" inputmode="decimal" placeholder="0.5" value="${esc(d.amount)}">${fe(i, "amount") ? `<span class="err">${fe(i, "amount")}</span>` : ""}</div>
-      <div class="field"><label for="m${i}">Due in (minutes)</label><input id="m${i}" data-f="minutes" data-i="${i}" inputmode="numeric" placeholder="10" value="${esc(d.minutes)}">${fe(i, "minutes") ? `<span class="err">${fe(i, "minutes")}</span>` : ""}</div></div>
+      <div class="row"><div class="field"><label for="a${i}">Amount (RLO)</label><input id="a${i}" data-f="amount" data-i="${i}" inputmode="decimal" placeholder="0.5" value="${esc(d.amount)}"><span class="err" data-e="${i}:amount">${fe(i, "amount") ?? ""}</span></div>
+      <div class="field"><label for="m${i}">Due in (minutes)</label><input id="m${i}" data-f="minutes" data-i="${i}" inputmode="numeric" placeholder="10" value="${esc(d.minutes)}"><span class="err" data-e="${i}:minutes">${fe(i, "minutes") ?? ""}</span></div></div>
       <div class="field"><label for="k${i}">Evidence</label><select id="k${i}" data-f="kind" data-i="${i}"><option value="pr" ${d.kind === "pr" ? "selected" : ""}>Merged pull request</option><option value="release" ${d.kind === "release" ? "selected" : ""}>Published release</option></select></div>
-      <div class="field"><label for="t${i}">${d.kind === "pr" ? "owner/repo#number" : "owner/repo@tag"}</label><input id="t${i}" data-f="target" data-i="${i}" spellcheck="false" autocomplete="off" placeholder="${d.kind === "pr" ? "acme/site#42" : "acme/site@v1.0.0"}" value="${esc(d.target)}">${fe(i, "target") ? `<span class="err">${fe(i, "target")}</span>` : ""}</div></fieldset>`).join("");
+      <div class="field"><label for="t${i}">${d.kind === "pr" ? "owner/repo#number" : "owner/repo@tag"}</label><input id="t${i}" data-f="target" data-i="${i}" spellcheck="false" autocomplete="off" placeholder="${d.kind === "pr" ? "acme/site#42" : "acme/site@v1.0.0"}" value="${esc(d.target)}"><span class="err" data-e="${i}:target">${fe(i, "target") ?? ""}</span></div></fieldset>`).join("");
     const active = document.activeElement as HTMLInputElement | null, id = active?.id, pos = active?.selectionStart ?? null;
     root().innerHTML = `${head("New deal", "Rialo devnet")}
       <p class="lb-desc">Fund up to ${MAX_MILESTONES} milestones. At each deadline validators check GitHub and the program pays the seller or refunds you.</p>
       <div class="banner"><div class="lab">Your devnet wallet</div><div class="mono" style="margin:4px 0 8px">${wallet?.address ?? "Starting…"}</div>
         <div class="actions"><b class="serif" style="font-size:20px;font-weight:400">${balance == null ? "…" : fmtRlo(balance)} RLO</b><button type="button" class="btn ghost sm" data-faucet>Get 1 test RLO</button></div><p class="note" id="fMsg" role="status" style="margin:8px 0 0">Devnet only. This key lives in this browser.</p></div>
       <form class="form" id="dealForm" novalidate>
-        <div class="field"><label for="seller">Seller address</label><input id="seller" spellcheck="false" autocomplete="off" placeholder="Who is paid if the work ships" value="${esc(seller)}">${touched && errs.seller ? `<span class="err">${errs.seller}</span>` : ""}</div>
+        <div class="field"><label for="seller">Seller address</label><input id="seller" spellcheck="false" autocomplete="off" placeholder="Who is paid if the work ships" value="${esc(seller)}"><span class="err" data-e="seller">${touched && errs.seller ? errs.seller : ""}</span></div>
         ${ms}
         <div class="actions">${drafts.length < MAX_MILESTONES ? `<button type="button" class="btn ghost" data-add>Add a milestone</button>` : ""}<span class="note">Total ${fmtRlo(total)} RLO</span></div>
         <div class="actions"><button class="btn" type="submit" ${busy ? "disabled" : ""}>${busy ? "Working…" : "Create and fund the deal"}</button></div>
@@ -104,9 +112,9 @@ export function openNewDeal(done?: () => void) {
     root().querySelector("[data-faucet]")?.addEventListener("click", async () => { const m = await faucet(); $("#fMsg").textContent = m ?? "Requested 1 RLO from the faucet."; });
     root().querySelector("[data-add]")?.addEventListener("click", () => { drafts.push({ amount: "", minutes: "", kind: "pr", target: "" }); render(); });
     root().querySelectorAll<HTMLElement>("[data-rm]").forEach((b) => b.addEventListener("click", () => { drafts.splice(Number(b.dataset.rm), 1); render(); }));
-    $("#seller").addEventListener("input", (e) => { seller = (e.target as HTMLInputElement).value; });
+    $("#seller").addEventListener("input", (e) => { seller = (e.target as HTMLInputElement).value; paintErrors(); });
     root().querySelectorAll<HTMLInputElement>("[data-f]").forEach((el) => el.addEventListener(el.tagName === "SELECT" ? "change" : "input", () => {
-      (drafts[Number(el.dataset.i)] as unknown as Record<string, string>)[el.dataset.f!] = el.value; if (el.tagName === "SELECT") render();
+      (drafts[Number(el.dataset.i)] as unknown as Record<string, string>)[el.dataset.f!] = el.value; if (el.tagName === "SELECT") render(); else paintErrors();
     }));
     $("#dealForm").addEventListener("submit", (e) => { e.preventDefault(); void submit(); });
   };
