@@ -1,0 +1,64 @@
+import { SANS, SERIF } from "./core";
+import type { Item } from "../data";
+import { phaseName } from "../lib/rialo/decode";
+import { fmtRlo, short } from "../lib/format";
+
+const W = 640, H = 360;
+const COL = { paid: "#8fcfa0", refunded: "#e3b567", funded: "#8fa0ff", checking: "#8fa0ff", created: "#8a8a88", unknown: "#8a8a88" } as Record<string, string>;
+const mk = (w = W, h = H) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
+
+function wrap(g: CanvasRenderingContext2D, text: string, maxW: number): string[] {
+  const out: string[] = []; let line = "";
+  for (const w of text.split(" ")) { const t = line ? `${line} ${w}` : w; if (g.measureText(t).width > maxW && line) { out.push(line); line = w; } else line = t; }
+  if (line) out.push(line); return out;
+}
+function base(g: CanvasRenderingContext2D, accent: string) {
+  const bg = g.createLinearGradient(0, 0, W, H); bg.addColorStop(0, "#19191b"); bg.addColorStop(1, "#111113");
+  g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  g.strokeStyle = accent; g.globalAlpha = .55; g.lineWidth = 2; g.strokeRect(1, 1, W - 2, H - 2); g.globalAlpha = 1;
+}
+const ACC: Record<string, string> = { rule: "#8a8a88", verified: "#8fcfa0", open: "#e3b567", deal: "#8fa0ff" };
+
+/** Still face of a card (what the tile shows). */
+export function drawStill(it: Item, chip = false): HTMLCanvasElement {
+  const c = mk(), g = c.getContext("2d")!; base(g, ACC[it.face]!);
+  g.fillStyle = "#8a8a88"; g.font = `500 28px ${SANS}`; g.textBaseline = "top"; if (!chip) g.fillText(it.category, 32, 30);
+  g.textAlign = "right"; g.fillText(it.meta, W - 32, 30); g.textAlign = "left";
+  if (it.face === "deal") return drawDealBody(g, c, it);
+  g.fillStyle = "#ededeb"; g.font = `300 84px ${SERIF}`;
+  const lines = wrap(g, it.title, W - 64); let y = H - 36 - lines.length * 86;
+  for (const l of lines) { g.fillText(l, 32, y); y += 86; }
+  return c;
+}
+function drawDealBody(g: CanvasRenderingContext2D, c: HTMLCanvasElement, it: Item) {
+  g.fillStyle = "#ededeb"; g.font = `300 46px ${SERIF}`; g.fillText(it.title, 32, 78);
+  const d = it.live?.deal;
+  if (!d) { g.fillStyle = "#8a8a88"; g.font = `italic 300 26px ${SERIF}`; g.fillText(it.live === null ? "Reading from devnet…" : "Not found", 32, 150); return c; }
+  const n = d.milestones.length, gap = 10, bw = (W - 64 - gap * (n - 1)) / n;
+  d.milestones.forEach((m, i) => {
+    const x = 32 + i * (bw + gap), col = COL[phaseName(m.status)]!;
+    g.fillStyle = col; g.globalAlpha = .22; g.fillRect(x, 150, bw, 110); g.globalAlpha = 1;
+    g.fillStyle = col; g.fillRect(x, 150, bw, 3);
+    g.fillStyle = "#ededeb"; g.font = `500 20px ${SANS}`; g.fillText(`${fmtRlo(m.amount)} RLO`, x + 10, 172);
+    g.fillStyle = col; g.font = `italic 300 22px ${SERIF}`; g.fillText(phaseName(m.status), x + 10, 208);
+  });
+  g.fillStyle = "#8a8a88"; g.font = `500 20px ${SANS}`; g.fillText(`Seller ${short(d.payee)}`, 32, H - 52);
+  return c;
+}
+/** Second face shown on hover: the description. */
+export function drawDetail(it: Item): HTMLCanvasElement {
+  const c = mk(), g = c.getContext("2d")!; base(g, ACC[it.face]!);
+  g.fillStyle = "#8a8a88"; g.font = `500 22px ${SANS}`; g.textBaseline = "top"; g.fillText(it.title, 32, 30);
+  g.fillStyle = "#ededeb"; g.font = `300 31px ${SERIF}`;
+  let y = 84; for (const l of wrap(g, it.description, W - 64).slice(0, 6)) { g.fillText(l, 32, y); y += 40; }
+  if (it.face === "deal" && it.live) {
+    g.fillStyle = "#8fa0ff"; g.font = `italic 300 26px ${SERIF}`; g.fillText("Open the deal", 32, H - 56);
+  }
+  return c;
+}
+export function drawText(text: string, font: string, color: string, dpr = 2): HTMLCanvasElement {
+  const t = mk(8, 8).getContext("2d")!; t.font = font; const w = Math.ceil(t.measureText(text).width) + 4;
+  const px = parseFloat(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] ?? "16");
+  const c = mk(w * dpr, Math.ceil(px * 1.5) * dpr), g = c.getContext("2d")!;
+  g.scale(dpr, dpr); g.font = font; g.fillStyle = color; g.textBaseline = "middle"; g.fillText(text, 2, c.height / dpr / 2); return c;
+}

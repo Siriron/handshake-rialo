@@ -3,15 +3,48 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Handshake — milestone escrow on Rialo</title>
-  <meta name="description" content="Fund a deal in milestones. Rialo validators check GitHub evidence at each deadline and the program pays the seller or refunds the buyer. No keeper, no oracle, no manual step.">
-  <meta name="color-scheme" content="dark light">
+  <title>Handshake — Milestone escrow on Rialo</title>
+  <meta name="description" content="Handshake pays milestones when the work ships. Rialo validators check GitHub evidence at each deadline and the program pays the seller or refunds the buyer. Live on Rialo devnet.">
+  <meta name="theme-color" content="#0c0c0d">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Newsreader:ital,wght@0,300;0,400;1,300;1,400&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Newsreader:ital,wght@0,300..500;1,300..500&display=swap">
+  <link rel="stylesheet" href="/src/styles.css">
 </head>
 <body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
+  <section class="view" id="gallery" aria-label="Explore">
+    <div class="stage" id="gStage"></div>
+    <div class="g-mark" id="gMark" aria-hidden="true"></div>
+    <div class="g-side left" aria-hidden="true"><span>Handshake</span></div>
+    <div class="g-side right" aria-hidden="true"><span>Milestone escrow on Rialo</span></div>
+    <div class="g-count" id="gCount" aria-hidden="true"><span>001</span></div>
+    <div class="g-caption" id="gCaption" aria-live="polite"><span class="t"></span><span class="c"></span></div>
+    <div class="g-hint" id="gHint">Drag to explore</div>
+    <div class="overview" id="overview" role="dialog" aria-label="Overview">
+      <div class="ov-head"><div><b id="ovTitle"></b> <span class="serif mute" id="ovMeta"></span></div><button class="pill" id="ovClose">Close</button></div>
+      <p class="serif" id="ovDesc"></p>
+      <div class="tags" id="ovTags"></div>
+      <div class="ov-actions" id="ovActions"></div>
+    </div>
+  </section>
+  <section class="view" id="projects" aria-label="Deals"><div class="stage" id="pStage"></div><div class="bubble" id="viewBubble">View</div><div class="p-live" id="pLive" aria-live="polite"></div></section>
+  <section class="view" id="about" aria-label="Proof"><div class="stage" id="aStage"></div><div class="a-hint" id="aHint"><span>Scroll</span><i>→</i></div></section>
+  <div class="cursor-label" id="cursorLabel"></div>
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Deal"><div class="lb-inner" id="lbInner"></div></div>
+  <nav class="dock" id="dock" aria-label="Main">
+    <a class="mark" href="#explore">Handshake</a><span class="sep"></span>
+    <a class="tab" href="#explore" data-view="gallery"><i>Explore</i><span>1</span></a>
+    <a class="tab" href="#deals" data-view="projects"><i>Deals</i><span>2</span></a>
+    <a class="tab" href="#proof" data-view="about"><i>Proof</i><span>3</span></a>
+    <span class="sep"></span><button class="dot-btn" id="menuBtn" aria-label="Menu" aria-expanded="false"></button>
+  </nav>
+  <div class="menu" id="menu" aria-hidden="true">
+    <p>Live on Rialo devnet. Test funds only.</p>
+    <a href="#proof"><span>Proof</span><small>03</small></a>
+    <a href="#deals"><span>Deals</span><small>02</small></a>
+    <a href="#explore"><span>Explore</span><small>01</small></a>
+    <button id="walletOpen"><span>Wallet</span><small id="walletBal">—</small></button>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

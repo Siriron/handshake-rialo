@@ -1,6 +1,6 @@
 # Handshake web
 
-Frontend for Handshake on Rialo devnet. React, Vite, Three.js.
+Frontend for Handshake on Rialo devnet. Vite, TypeScript, Three.js, GSAP. Three views: Explore (a sphere of cards you can spin and open), Deals (a WebGL grid with glass-lens edges; create, open and approve deals here) and Proof (a chrome bot over a horizontal text track).
 
 - `src/lib/rialo/` holds the chain code: deal and heartbeat address derivation, instruction encoding, and the 704-byte deal decoder. `test/` checks each against transactions and accounts recorded from devnet.
 - `api/rpc.ts` is a same-origin relay to the devnet RPC, which sends no CORS headers. It only forwards `get*`, `send*`, `request*` and `simulate*` methods.
