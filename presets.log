@@ -1,0 +1,48 @@
+
+> handshake-web@0.1.0 e2e:presets
+> tsx scripts/presets-e2e.ts
+
+00:35:50 demo seller balance before: 58024680
+00:35:50 release frontend validation: ok
+00:35:54 unmerged frontend validation: ok
+00:35:59 two-paid frontend validation: ok
+00:36:02 mixed frontend validation: ok
+00:36:06 approve frontend validation: ok
+00:36:15 [two-paid] Create the deal ok
+00:36:16 [unmerged] Create the deal ok
+00:36:16 [mixed] Create the deal ok
+00:36:16 [release] Create the deal ok
+00:36:16 [approve] Create the deal ok
+00:36:19 [approve] Add milestone 1 ok
+00:36:20 [two-paid] Add milestone 1 ok
+00:36:20 [mixed] Add milestone 1 ok
+00:36:20 [release] Add milestone 1 ok
+00:36:20 [unmerged] Add milestone 1 ok
+00:36:23 [approve] Fund the deal ok
+00:36:24 [release] Fund the deal ok
+00:36:24 [mixed] Add milestone 2 ok
+00:36:25 [two-paid] Add milestone 2 ok
+00:36:25 [unmerged] Fund the deal ok
+00:36:26 [release] milestones: funded
+00:36:26 [approve] approved milestone 1
+00:36:26 [approve] milestones: funded
+00:36:27 [unmerged] milestones: funded
+00:36:32 [mixed] Fund the deal ok
+00:36:32 [two-paid] Fund the deal ok
+00:36:34 [approve] milestones: paid
+00:36:35 [mixed] milestones: funded,funded
+00:36:35 [two-paid] milestones: funded,funded
+00:39:19 [release] milestones: paid
+00:39:23 [mixed] milestones: paid,funded
+00:39:23 [unmerged] milestones: refunded
+00:39:35 [two-paid] milestones: paid,funded
+00:41:22 [mixed] milestones: paid,refunded
+00:41:22 [two-paid] milestones: paid,checking
+00:41:30 [two-paid] milestones: paid,paid
+00:41:30 demo seller received: 250000000 expected at least: 200000000 (total funded 280000000)
+PASS approve - ended as expected (paid), nothing left held
+PASS release - ended as expected (paid), nothing left held
+PASS unmerged - ended as expected (refunded), nothing left held
+PASS mixed - ended as expected (paid, refunded), nothing left held
+PASS two-paid - ended as expected (paid, paid), nothing left held
+PRESETS PASSED
