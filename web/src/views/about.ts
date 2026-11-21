@@ -1,20 +1,21 @@
 import * as THREE from "three";
 import { $, clamp, gsap, isTouch, reduced, SANS, SERIF, type View } from "../ui/core";
+import { onTheme, pal, resolved } from "../theme";
 
 const REPO = "https://github.com/Siriron/handshake-rialo";
 interface L { text: string; font: string; color: string; gap: number; link?: string; lh?: number }
 interface B { pos: "top" | "bottom"; lines: L[]; width: number }
-const HEAD = (t: string): L => ({ text: t, font: `500 12px ${SANS}`, color: "#8a8a88", gap: 0 });
-const P = (t: string, font: string, gap = 0, color = "#ededeb", lh = 29): L => ({ text: t, font, color, gap, lh });
+const HEAD = (t: string): L => ({ text: t, font: `500 12px ${SANS}`, color: "mute", gap: 0 });
+const P = (t: string, font: string, gap = 0, color = "ink", lh = 29): L => ({ text: t, font, color, gap, lh });
 
 /** Real product content, from the repository and its recorded runs. */
 function blocks(phone: boolean): B[] {
   const pw = phone ? Math.min(innerWidth - 56, 300) : 320;
   const para = (title: string, body: string, pos: B["pos"]): B => ({ pos, width: pw, lines: [HEAD(title), P(body, `300 22px ${SERIF}`, 16)] });
-  const list = (title: string, items: string[], pos: B["pos"]): B => ({ pos, width: 260, lines: [HEAD(title), ...items.map((t, i) => P(t, `400 18px ${SERIF}`, i ? 7 : 16, "#ededeb", 24))] });
-  const chapter = (kicker: string, num: string, body: string, pos: B["pos"]): B => ({ pos, width: 300, lines: [HEAD(kicker), P(num, `300 72px ${SERIF}`, 10, "#ededeb", 72), P(body, `300 19px ${SERIF}`, 6, "#ededeb", 26)] });
-  const quote = (q: string, by: string, pos: B["pos"]): B => ({ pos, width: phone ? 300 : 440, lines: [P(q, `italic 300 ${phone ? 30 : 40}px ${SERIF}`, 0, "#ededeb", (phone ? 30 : 40) * 1.12), { ...HEAD(by), gap: 14 }] });
-  const stats = (title: string, rows: string[], pos: B["pos"]): B => ({ pos, width: 260, lines: [HEAD(title), ...rows.map((t, i) => P(t, `400 18px ${SANS}`, i ? 9 : 16, "#ededeb", 24))] });
+  const list = (title: string, items: string[], pos: B["pos"]): B => ({ pos, width: 260, lines: [HEAD(title), ...items.map((t, i) => P(t, `400 18px ${SERIF}`, i ? 7 : 16, "ink", 24))] });
+  const chapter = (kicker: string, num: string, body: string, pos: B["pos"]): B => ({ pos, width: 300, lines: [HEAD(kicker), P(num, `300 72px ${SERIF}`, 10, "ink", 72), P(body, `300 19px ${SERIF}`, 6, "ink", 26)] });
+  const quote = (q: string, by: string, pos: B["pos"]): B => ({ pos, width: phone ? 300 : 440, lines: [P(q, `italic 300 ${phone ? 30 : 40}px ${SERIF}`, 0, "ink", (phone ? 30 : 40) * 1.12), { ...HEAD(by), gap: 14 }] });
+  const stats = (title: string, rows: string[], pos: B["pos"]): B => ({ pos, width: 260, lines: [HEAD(title), ...rows.map((t, i) => P(t, `400 18px ${SANS}`, i ? 9 : 16, "ink", 24))] });
   return [
     para("How it works", "Fund up to four milestones. At each deadline validators check GitHub, and the program pays the seller or refunds you.", "top"),
     list("Evidence", ["Published release", "Merged pull request", "owner/repo@tag", "owner/repo#number"], "bottom"),
@@ -26,9 +27,9 @@ function blocks(phone: boolean): B[] {
     list("Not yet shown", ["Direct handler calls", "Forged report argument", "Stuck-check rescue", "Long-running deals"], "bottom"),
     quote("“Claims stop where the evidence stops.”", "— Evidence notes", "top"),
     { pos: "bottom", width: 280, lines: [HEAD("Source"),
-      { text: "Code on GitHub →", font: `300 22px ${SERIF}`, color: "#ededeb", gap: 16, link: REPO, lh: 29 },
-      { text: "Evidence and limits →", font: `300 22px ${SERIF}`, color: "#ededeb", gap: 8, link: `${REPO}/blob/main/docs/EVIDENCE.md`, lh: 29 },
-      { text: "Open a deal →", font: `300 22px ${SERIF}`, color: "#ededeb", gap: 8, link: "#deals", lh: 29 }] },
+      { text: "Code on GitHub →", font: `300 22px ${SERIF}`, color: "ink", gap: 16, link: REPO, lh: 29 },
+      { text: "Evidence and limits →", font: `300 22px ${SERIF}`, color: "ink", gap: 8, link: `${REPO}/blob/main/docs/EVIDENCE.md`, lh: 29 },
+      { text: "Open a deal →", font: `300 22px ${SERIF}`, color: "ink", gap: 8, link: "#deals", lh: 29 }] },
   ];
 }
 
@@ -87,20 +88,29 @@ export function createAbout(): View {
     botU.uMinY.value = box.min.y - c.y; botU.uMaxY.value = box.max.y - c.y; (botRoot.userData as { H: number }).H = box.max.y - box.min.y;
     botRoot.add(bot); botRoot.position.z = -1; scene.add(botRoot);
   }
-  function envMap() {
-    const room = new THREE.Scene(), bg = new THREE.Mesh(new THREE.BoxGeometry(30, 20, 30), new THREE.MeshBasicMaterial({ color: 0x0a0a0b, side: THREE.BackSide })); room.add(bg);
+  const envs: Partial<Record<"dark" | "light", THREE.Texture>> = {};
+  /** Dark studio for night, bright studio with dark flags for day. The dark one is the original look. */
+  function envFor(theme: "dark" | "light") {
+    if (envs[theme]) return envs[theme]!;
+    const light = theme === "light";
+    const room = new THREE.Scene(), bg = new THREE.Mesh(new THREE.BoxGeometry(30, 20, 30), new THREE.MeshBasicMaterial({ color: light ? 0xc9c9c6 : 0x0a0a0b, side: THREE.BackSide })); room.add(bg);
     const panel = (w: number, h: number, i: number, pos: [number, number, number], rot: [number, number, number]) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color().setScalar(i), side: THREE.DoubleSide })); m.position.set(...pos); m.rotation.set(...rot); room.add(m); };
-    panel(14, 5, 1.1, [0, 6, 0], [Math.PI / 2, 0, 0]); panel(3.2, 10, 1.0, [-6, 0, 0], [0, Math.PI / 2, 0]); panel(2.4, 10, .85, [6, 0, 0], [0, Math.PI / 2, 0]);
-    panel(12, 2.2, .6, [0, -1.5, -6], [0, 0, 0]); panel(5, 4, .8, [3, 2.5, 6], [0, Math.PI, 0]); panel(14, 6, .22, [0, -6, 0], [Math.PI / 2, 0, 0]);
-    const pm = new THREE.PMREMGenerator(renderer), tex = pm.fromScene(room, .02).texture; pm.dispose(); return tex;
+    if (!light) {
+      panel(14, 5, 1.1, [0, 6, 0], [Math.PI / 2, 0, 0]); panel(3.2, 10, 1.0, [-6, 0, 0], [0, Math.PI / 2, 0]); panel(2.4, 10, .85, [6, 0, 0], [0, Math.PI / 2, 0]);
+      panel(12, 2.2, .6, [0, -1.5, -6], [0, 0, 0]); panel(5, 4, .8, [3, 2.5, 6], [0, Math.PI, 0]); panel(14, 6, .22, [0, -6, 0], [Math.PI / 2, 0, 0]);
+    } else {
+      panel(14, 5, 1.7, [0, 6, 0], [Math.PI / 2, 0, 0]); panel(3.2, 10, 1.3, [-6, 0, 0], [0, Math.PI / 2, 0]); panel(2.4, 10, .02, [6, 0, 0], [0, Math.PI / 2, 0]);
+      panel(12, 2.2, .03, [0, -1.5, -6], [0, 0, 0]); panel(5, 4, 1.1, [3, 2.5, 6], [0, Math.PI, 0]); panel(14, 6, .55, [0, -6, 0], [Math.PI / 2, 0, 0]);
+    }
+    const pm = new THREE.PMREMGenerator(renderer), tex = pm.fromScene(room, .02).texture; pm.dispose(); envs[theme] = tex; return tex;
   }
 
   /* ---------- lens burst ---------- */
-  let disc!: THREE.Mesh; const lensU = { uBg: { value: null as THREE.Texture | null }, uRes: { value: new THREE.Vector2() }, uCenter: { value: new THREE.Vector2() }, uR: { value: 1 }, uDis: { value: 0 } };
+  let disc!: THREE.Mesh; const lensU = { uBg: { value: null as THREE.Texture | null }, uRes: { value: new THREE.Vector2() }, uCenter: { value: new THREE.Vector2() }, uR: { value: 1 }, uDis: { value: 0 }, uInv: { value: 0 } };
   function buildDisc() {
     disc = new THREE.Mesh(new THREE.CircleGeometry(1, 96), new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: lensU,
       vertexShader: "void main(){ gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }",
-      fragmentShader: `uniform sampler2D uBg; uniform vec2 uRes,uCenter; uniform float uR,uDis;
+      fragmentShader: `uniform sampler2D uBg; uniform vec2 uRes,uCenter; uniform float uR,uDis,uInv;
  float gs(float x,float c,float s){ return exp(-pow((x-c)/s,2.)); }
  void main(){ vec2 fc=gl_FragCoord.xy; vec2 d=fc-uCenter; float nd=length(d)/uR; if(nd>1.) discard;
   float dist=1.-min(uDis/.8,1.); float lightF=1.-min(uDis/.6,1.); float alpha=1.-smoothstep(.8,1.,uDis);
@@ -109,9 +119,12 @@ export function createAbout(): View {
   vec2 base=cuv+(uv-cuv)*(1.-pull); float disp=1.64*.004*smoothstep(.6,1.,nd)*dist; vec3 acc=vec3(0.),ws=vec3(0.);
   for(int i=0;i<8;i++){ float s=float(i)/7.; vec2 o=dir*(s-.5)*disp*2.; vec3 w=vec3(gs(s,.15,.35),gs(s,.5,.35),gs(s,.85,.35)); acc+=texture2D(uBg,clamp(base+o,0.,1.)).rgb*w; ws+=w; }
   vec3 col=acc/ws; float r=nd*.5;
-  float nova=exp(-nd*nd*4.*1.)*.2122*lightF; col+=vec3(1.)*nova;
-  float ring=exp(-pow((r-.49)/.08,2.))*(.9*11./17.*1.8)*lightF; float aura=exp(-pow((r-.49)/.2,2.))*.25*lightF; col+=vec3(.145,.169,.655)*(ring+aura);
-  col+=vec3(1.)*exp(-pow((r-.483)/.012,2.))*.7*lightF; col+=vec3(.145,.169,.655)*exp(-pow((r-.478)/.06,2.))*1.053*lightF*.5;
+  float nova=exp(-nd*nd*4.*1.)*.2122*lightF;
+  float ring=exp(-pow((r-.49)/.08,2.))*(.9*11./17.*1.8)*lightF; float aura=exp(-pow((r-.49)/.2,2.))*.25*lightF;
+  float rim=exp(-pow((r-.483)/.012,2.))*.7*lightF; float edge=exp(-pow((r-.478)/.06,2.))*1.053*lightF*.5;
+  vec3 blue=vec3(.145,.169,.655);
+  if(uInv>.5){ col=mix(col,blue,clamp(ring*.5+aura*.3+edge*.45,0.,.55)); col=mix(col,vec3(.06,.07,.3),clamp(rim,0.,.5)); }
+  else { col+=vec3(1.)*nova; col+=blue*(ring+aura); col+=vec3(1.)*rim; col+=blue*edge; }
   gl_FragColor=vec4(col,alpha);
   #include <colorspace_fragment>
  }` }));
@@ -141,7 +154,8 @@ export function createAbout(): View {
   }
 
   /* ---------- text ---------- */
-  function lineTex(text: string, font: string, color: string) {
+  function lineTex(text: string, font: string, tone: string) {
+    const color = tone === "mute" ? pal().mute : tone === "ink" ? pal().ink : tone;
     const t = document.createElement("canvas").getContext("2d")!; t.font = font; const w = Math.ceil(t.measureText(text).width) + 4, px = parseFloat(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] ?? "16"), h = Math.ceil(px * 1.4) + 2;
     const c = document.createElement("canvas"); c.width = Math.ceil(w * dpr()); c.height = Math.ceil(h * dpr()); const g = c.getContext("2d", { willReadFrequently: true })!; g.scale(dpr(), dpr()); g.font = font; g.fillStyle = color; g.textBaseline = "middle"; g.fillText(text, 2, h / 2 + px * .04);
     const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
@@ -162,15 +176,15 @@ export function createAbout(): View {
     if (tab) { while (size > 24 && widest() > vw - 40) { size -= 2; g0.font = `300 ${size}px ${SERIF}`; } }
     const wrapW = vw - 40; const tl: string[] = []; for (const t of texts) tl.push(...(g0.measureText(t).width > wrapW ? wrapText(t, `300 ${size}px ${SERIF}`, wrapW) : [t]));
     const lhH = size * 1.18, total = tl.length * lhH;
-    const hc = document.createElement("canvas"); hc.width = Math.ceil(vw * dpr()); hc.height = Math.ceil(vh * dpr()); const hg = hc.getContext("2d", { willReadFrequently: true })!; hg.scale(dpr(), dpr()); hg.fillStyle = "#ededeb"; hg.textBaseline = "middle"; hg.textAlign = "center";
+    const hc = document.createElement("canvas"); hc.width = Math.ceil(vw * dpr()); hc.height = Math.ceil(vh * dpr()); const hg = hc.getContext("2d", { willReadFrequently: true })!; hg.scale(dpr(), dpr()); hg.fillStyle = pal().ink; hg.textBaseline = "middle"; hg.textAlign = "center";
     (hg as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${-.01 * size}px`; hg.font = `300 ${size}px ${SERIF}`;
     const y0 = vh / 2 - total / 2 + lhH / 2; tl.forEach((t, i) => hg.fillText(t, vw / 2, y0 + i * lhH));
     const ft = phone ? 12 : 14, fy = y0 + (tl.length - 1) * lhH + lhH / 2 + 56;
-    (hg as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = "0px"; hg.font = `500 ${ft}px ${SANS}`; hg.fillStyle = "#8a8a88"; const a = "Live on ", b = "Rialo devnet"; const wa = hg.measureText(a).width, wb = hg.measureText(b).width;
-    hg.textAlign = "left"; hg.fillText(a, vw / 2 - (wa + wb) / 2, fy); hg.fillStyle = "#ededeb"; hg.fillText(b, vw / 2 - (wa + wb) / 2 + wa, fy);
+    (hg as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = "0px"; hg.font = `500 ${ft}px ${SANS}`; hg.fillStyle = pal().mute; const a = "Live on ", b = "Rialo devnet"; const wa = hg.measureText(a).width, wb = hg.measureText(b).width;
+    hg.textAlign = "left"; hg.fillText(a, vw / 2 - (wa + wb) / 2, fy); hg.fillStyle = pal().ink; hg.fillText(b, vw / 2 - (wa + wb) / 2 + wa, fy);
     const ht = new THREE.CanvasTexture(hc); ht.colorSpace = THREE.SRGBColorSpace; ht.minFilter = THREE.LinearFilter; ht.generateMipmaps = false;
     const hm = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: ht, transparent: true, depthWrite: false })); hm.scale.set(vw * wpp, vh * wpp, 1); hm.position.z = -8; textGroup.add(hm);
-    const shade = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0x0c0c0d, transparent: true, opacity: 0, depthWrite: false })); shade.scale.set((wb + 12) * wpp, (ft + 14) * wpp, 1); shade.position.z = -7.98; textGroup.add(shade);
+    const shade = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: new THREE.Color(pal().bg), transparent: true, opacity: 0, depthWrite: false })); shade.scale.set((wb + 12) * wpp, (ft + 14) * wpp, 1); shade.position.z = -7.98; textGroup.add(shade);
     headline = { mesh: hm, w: vw, x0: 0 }; foot = { mesh: hm, w: wb, h: ft, x0: (wa - wb) / 2 + (wa + wb) / 2 - (wa + wb) / 2 + 0, shade };
     (foot as unknown as { fy: number; cx: number }).fy = fy; (foot as unknown as { fy: number; cx: number }).cx = vw / 2 - (wa + wb) / 2 + wa + wb / 2;
     // track
@@ -232,11 +246,17 @@ export function createAbout(): View {
     vw = stage.clientWidth; vh = stage.clientHeight; wpp = (2 * 21 * Math.tan(22.5 * Math.PI / 180)) / vh;
     renderer.setSize(vw, vh, false); camera.aspect = vw / vh; camera.updateProjectionMatrix(); rt.setSize(vw * dpr(), vh * dpr()); placeBot(); buildText();
   }
+  /** Re-lights the bot, recolours the text and background for the new theme. */
+  function restyle() {
+    if (!built) return;
+    renderer.setClearColor(pal().bg, 1); (scene.background as THREE.Color).set(pal().bg);
+    scene.environment = envFor(resolved); lensU.uInv.value = pal().dark ? 0 : 1; buildText();
+  }
   function build() {
-    renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(dpr()); renderer.setClearColor("#0c0c0d", 1); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.NoToneMapping; stage.appendChild(renderer.domElement);
-    scene = new THREE.Scene(); scene.background = new THREE.Color("#0c0c0d"); scene.environment = envMap(); scene.add(textGroup, root);
+    renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(dpr()); renderer.setClearColor(pal().bg, 1); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.NoToneMapping; stage.appendChild(renderer.domElement);
+    scene = new THREE.Scene(); scene.background = new THREE.Color(pal().bg); scene.environment = envFor(resolved); scene.add(textGroup, root);
     camera = new THREE.PerspectiveCamera(45, 1, .1, 100); camera.position.z = 13; rt = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType });
-    buildBot(); buildDisc(); layout(); built = true;
+    buildBot(); buildDisc(); lensU.uInv.value = pal().dark ? 0 : 1; layout(); built = true; onTheme(restyle);
     const pos = (e: PointerEvent) => { const r = stage.getBoundingClientRect(); ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); lastClientX = e.clientX - r.left; lastClientY = e.clientY - r.top; };
     stage.addEventListener("pointermove", (e) => {
       pos(e); wake(); moved = true; if (!isTouch && !reduced) { const nx = (lastClientX - vw / 2) / (vw / 2), ny = (lastClientY - vh / 2) / (vh / 2); tgt.x = clamp(ny, -.62, .62) * 1; tgt.y = clamp(nx, -.59, .59); tgt.z = .2 * nx; }

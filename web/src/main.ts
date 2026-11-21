@@ -3,6 +3,13 @@ import { initWallet, onWallet, balance, wallet } from "./session";
 import { fmtRlo } from "./lib/format";
 import { close as closeLb, openDeal, openWallet } from "./ui/panels";
 import { createGallery } from "./views/gallery";
+import { initTheme, mode, onTheme, setMode, type Mode } from "./theme";
+
+initTheme();
+const seg = $("#themeSeg");
+const paintSeg = () => seg.querySelectorAll<HTMLButtonElement>("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.m === mode)));
+seg.addEventListener("click", (e) => { const m = (e.target as HTMLElement).closest("button")?.dataset.m as Mode | undefined; if (m) setMode(m); });
+onTheme(paintSeg); paintSeg();
 
 const dock = $("#dock");
 let dockShown = false;

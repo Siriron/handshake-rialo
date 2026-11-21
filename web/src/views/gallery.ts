@@ -5,6 +5,7 @@ import { drawStill } from "../ui/cards";
 import { client } from "../session";
 import { readDeal } from "../lib/rialo/chain";
 import { openDeal } from "../ui/panels";
+import { onTheme, pal } from "../theme";
 
 const FOV = 60, CAM_Z = 12;
 export function createGallery(onReady: () => void): View {
@@ -52,7 +53,7 @@ export function createGallery(onReady: () => void): View {
     group = new THREE.Group(); scene.add(group);
     const geo = new THREE.PlaneGeometry(1, 1);
     items.forEach((it, i) => {
-      const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x1b1b1d, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+      const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: pal().faint, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
       m.userData = { item: it, loaded: false, i };
       group.add(m); planes.push(m);
     });
@@ -79,13 +80,23 @@ export function createGallery(onReady: () => void): View {
       wait();
     });
     built = true;
+    onTheme(restyle);
+  }
+  /** Redraws every card and the wordmark in the new theme. */
+  function restyle() {
+    if (!built) return;
+    planes.forEach((m, i) => {
+      const mat = m.material as THREE.MeshBasicMaterial;
+      if (m.userData.loaded && mat.map) { (mat.map as THREE.CanvasTexture).image = drawStill(items[i]!); mat.map.needsUpdate = true; } else mat.color.set(pal().faint);
+    });
+    if ($("#gMark").firstChild) drawWordmark();
   }
 
   /* ---------- intro ---------- */
   function drawWordmark() {
     const c = document.createElement("canvas"), g = c.getContext("2d")!; const s = 2;
     g.font = `600 64px ${SANS}`; const w = Math.ceil(g.measureText("Handshake").width) + 8; c.width = w * s; c.height = 90 * s;
-    g.scale(s, s); g.font = `600 64px ${SANS}`; g.fillStyle = "#ededeb"; g.textBaseline = "middle"; g.letterSpacing = "-1.3px"; g.fillText("Handshake", 4, 46);
+    g.scale(s, s); g.font = `600 64px ${SANS}`; g.fillStyle = pal().ink; g.textBaseline = "middle"; g.letterSpacing = "-1.3px"; g.fillText("Handshake", 4, 46);
     const el = $("#gMark"); el.innerHTML = ""; el.style.width = "180px"; el.appendChild(c);
   }
   function intro() {

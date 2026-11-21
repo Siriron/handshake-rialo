@@ -5,20 +5,21 @@ import { drawDetail, drawStill, drawText } from "../ui/cards";
 import { client, myDeals } from "../session";
 import { readDeal } from "../lib/rialo/chain";
 import { openNewDeal } from "../ui/panels";
+import { onTheme, pal } from "../theme";
 
 const GLYPHS = ". : · , ; _".split(" ");
 const toTex = (c: HTMLCanvasElement) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; };
 
 const TILE_V = `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`;
-const TILE_F = `uniform sampler2D uTex,uTex2; uniform float uMix,uReveal,uTime; varying vec2 vUv;
+const TILE_F = `uniform sampler2D uTex,uTex2; uniform float uMix,uReveal,uTime,uSkel; varying vec2 vUv;
 void main(){ vec3 a=texture2D(uTex,vUv).rgb,b=texture2D(uTex2,vUv).rgb; vec3 media=mix(a,b,uMix);
  float sweep=fract(uTime*.6); float band=smoothstep(.18,0.,abs((vUv.x+vUv.y)/2.-sweep))*.035;
- gl_FragColor=vec4(mix(vec3(.085+band),media,uReveal),1.); }`;
-const CHIP_F = `uniform sampler2D uTex,uTex2,uLabel; uniform float uMix,uReveal; uniform vec4 uRect; uniform vec2 uTile,uSize; varying vec2 vUv;
+ gl_FragColor=vec4(mix(vec3(uSkel+band),media,uReveal),1.); }`;
+const CHIP_F = `uniform sampler2D uTex,uTex2,uLabel; uniform float uMix,uReveal,uTint; uniform vec4 uRect; uniform vec2 uTile,uSize; varying vec2 vUv;
 vec3 media(vec2 uv){ return mix(texture2D(uTex,uv).rgb,texture2D(uTex2,uv).rgb,uMix); }
 void main(){ vec2 tuv=uRect.xy+vUv*uRect.zw; vec3 acc=vec3(0.);
  for(int i=0;i<32;i++){ float fi=float(i); float r=sqrt((fi+.5)/32.)*40.; float a=fi*2.39996323; acc+=media(clamp(tuv+vec2(cos(a),sin(a))*r/uTile,0.,1.)); }
- vec3 col=mix(acc/32.,vec3(.05),.45); vec4 l=texture2D(uLabel,vUv); col=mix(col,l.rgb,l.a);
+ vec3 col=mix(acc/32.,vec3(uTint),.45); vec4 l=texture2D(uLabel,vUv); col=mix(col,l.rgb,l.a);
  vec2 p=(vUv-.5)*uSize; vec2 q=abs(p)-uSize*.5+4.; float d=length(max(q,0.))+min(max(q.x,q.y),0.)-4.;
  gl_FragColor=vec4(col,(1.-smoothstep(-.8,.4,d))*uReveal); }`;
 const POST_F = `uniform sampler2D tDiffuse; varying vec2 vUv;
@@ -48,11 +49,11 @@ export function createDeals(): View {
   const newItem = (): Item => ({ id: "new", title: "New deal", category: "Create", meta: "Devnet", face: "rule", tags: [], description: "Fund up to four milestones. Validators check GitHub at each deadline and the program pays or refunds." });
   function newCard(it: Item, hover = false) {
     const c = document.createElement("canvas"); c.width = 640; c.height = 360; const g = c.getContext("2d")!;
-    const bg = g.createLinearGradient(0, 0, 640, 360); bg.addColorStop(0, "#19191b"); bg.addColorStop(1, "#111113"); g.fillStyle = bg; g.fillRect(0, 0, 640, 360);
-    g.strokeStyle = "#8a8a88"; g.globalAlpha = .55; g.setLineDash([8, 8]); g.lineWidth = 2; g.strokeRect(1, 1, 638, 358); g.setLineDash([]); g.globalAlpha = 1;
-    g.strokeStyle = "#ededeb"; g.lineWidth = 3; g.beginPath(); g.moveTo(320, 120); g.lineTo(320, 200); g.moveTo(280, 160); g.lineTo(360, 160); g.stroke();
-    g.fillStyle = "#ededeb"; g.textAlign = "center"; g.font = `300 56px ${SERIF}`; g.fillText(hover ? "Fund it in minutes" : it.title, 320, 280);
-    g.fillStyle = "#8a8a88"; g.font = `500 24px ${SANS}`; g.fillText(hover ? "Up to four milestones" : "Rialo devnet", 320, 322); return c;
+    const bg = g.createLinearGradient(0, 0, 640, 360); bg.addColorStop(0, pal().cardA); bg.addColorStop(1, pal().cardB); g.fillStyle = bg; g.fillRect(0, 0, 640, 360);
+    g.strokeStyle = pal().mute; g.globalAlpha = .55; g.setLineDash([8, 8]); g.lineWidth = 2; g.strokeRect(1, 1, 638, 358); g.setLineDash([]); g.globalAlpha = 1;
+    g.strokeStyle = pal().ink; g.lineWidth = 3; g.beginPath(); g.moveTo(320, 120); g.lineTo(320, 200); g.moveTo(280, 160); g.lineTo(360, 160); g.stroke();
+    g.fillStyle = pal().ink; g.textAlign = "center"; g.font = `300 56px ${SERIF}`; g.fillText(hover ? "Fund it in minutes" : it.title, 320, 280);
+    g.fillStyle = pal().mute; g.font = `500 24px ${SANS}`; g.fillText(hover ? "Up to four milestones" : "Rialo devnet", 320, 322); return c;
   }
 
   function sources(): { item: Item; kind: "new" | "deal" }[] {
@@ -68,7 +69,7 @@ export function createDeals(): View {
   }
 
   function chipFor(label: string) {
-    const lc = drawText(label, `500 12px ${SANS}`, "#ededeb", dpr()), cw = lc.width / dpr() + 16, chh = lc.height / dpr() / 1.5 + 10;
+    const lc = drawText(label, `500 12px ${SANS}`, pal().ink, dpr()), cw = lc.width / dpr() + 16, chh = lc.height / dpr() / 1.5 + 10;
     const cc = document.createElement("canvas"); cc.width = Math.ceil(cw * dpr()); cc.height = Math.ceil(chh * dpr()); cc.getContext("2d")!.drawImage(lc, 8 * dpr(), 6 * dpr()); return { cc, cw, chh };
   }
   function setChip(t: Tile, label: string) {
@@ -95,7 +96,7 @@ export function createDeals(): View {
     const full = a + b; const rnd = Array.from(full, () => Math.random());
     const lines = phone ? [[a + "by evidence,", 0], ["not by trust", 1]] as const : [[full, 0]] as const; void lines;
     const draw = (p: number) => {
-      hg.setTransform(1, 0, 0, 1, 0, 0); hg.clearRect(0, 0, hc.width, hc.height); hg.scale(dpr(), dpr()); hg.textBaseline = "middle"; hg.fillStyle = "#ededeb";
+      hg.setTransform(1, 0, 0, 1, 0, 0); hg.clearRect(0, 0, hc.width, hc.height); hg.scale(dpr(), dpr()); hg.textBaseline = "middle"; hg.fillStyle = pal().ink;
       const out = Array.from(full, (ch, i) => (ch === " " || p >= 1 || p > .7 * (i / full.length) + .3 * rnd[i]!) ? ch : GLYPHS[Math.floor(rnd[i]! * 1000 + p * 12) % GLYPHS.length]!);
       const seg1 = out.slice(0, a.length).join(""), seg2 = out.slice(a.length).join("");
       hg.font = f1; (hg as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = "-0.16px"; const w1 = hg.measureText(seg1).width;
@@ -113,13 +114,13 @@ export function createDeals(): View {
     src.forEach((s, i) => {
       const col = i % cols, row = Math.floor(i / cols), x = pad + col * (tw + gap), y = gridTop + row * (th + 12 + 12 + 14 + 6 + 13 + rowGap);
       const still = toTex(s.kind === "new" ? newCard(s.item) : drawStill(s.item, true)), hover = toTex(s.kind === "new" ? newCard(s.item, true) : drawDetail(s.item));
-      const mat = new THREE.ShaderMaterial({ vertexShader: TILE_V, fragmentShader: TILE_F, uniforms: { uTex: { value: still }, uTex2: { value: hover }, uMix: { value: 0 }, uReveal: { value: s.kind === "new" ? 1 : 0 }, uTime: timeU } });
+      const mat = new THREE.ShaderMaterial({ vertexShader: TILE_V, fragmentShader: TILE_F, uniforms: { uTex: { value: still }, uTex2: { value: hover }, uMix: { value: 0 }, uReveal: { value: s.kind === "new" ? 1 : 0 }, uTime: timeU, uSkel: { value: pal().skeleton } } });
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat); mesh.scale.set(tw, th, 1);
       // chip
       const idx = String(i + 1).padStart(2, "0"), { cc, cw, chh } = chipFor(`${idx}  ${s.item.category}`), ct = toTex(cc);
-      const chipMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, vertexShader: TILE_V, fragmentShader: CHIP_F, uniforms: { uTex: { value: still }, uTex2: { value: hover }, uLabel: { value: ct }, uMix: mat.uniforms.uMix!, uReveal: mat.uniforms.uReveal!, uTile: { value: new THREE.Vector2(tw, th) }, uSize: { value: new THREE.Vector2(cw, chh) }, uRect: { value: new THREE.Vector4(8 / tw, 1 - (8 + chh) / th, cw / tw, chh / th) } } });
+      const chipMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, vertexShader: TILE_V, fragmentShader: CHIP_F, uniforms: { uTex: { value: still }, uTex2: { value: hover }, uLabel: { value: ct }, uMix: mat.uniforms.uMix!, uReveal: mat.uniforms.uReveal!, uTint: { value: pal().chipTint }, uTile: { value: new THREE.Vector2(tw, th) }, uSize: { value: new THREE.Vector2(cw, chh) }, uRect: { value: new THREE.Vector4(8 / tw, 1 - (8 + chh) / th, cw / tw, chh / th) } } });
       const chip = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), chipMat); chip.scale.set(cw, chh, 1);
-      const title = textPlane(s.item.title, `500 12px ${SANS}`, "#ededeb"), cat = textPlane(`${s.item.category}, ${s.item.meta}`, `400 13px ${SERIF}`, "#8a8a88");
+      const title = textPlane(s.item.title, `500 12px ${SANS}`, pal().ink), cat = textPlane(`${s.item.category}, ${s.item.meta}`, `400 13px ${SERIF}`, pal().mute);
       [mesh, chip, title, cat].forEach((o) => { content.add(o); (o.material as THREE.Material).transparent = true; });
       const place = (dy = 0) => {
         mesh.position.set(x + tw / 2, -(y + th / 2) - dy, 0); chip.position.set(x + 8 + cw / 2, -(y + 8 + chh / 2) - dy, .1);
@@ -131,7 +132,7 @@ export function createDeals(): View {
       mesh.visible = false;
     });
     const rows = Math.ceil(src.length / cols), lastBottom = gridTop + rows * (th + 12 + 12 + 14 + 6 + 13 + rowGap) - rowGap;
-    const foot = textPlane("Handshake — Rialo devnet", `400 13px ${SERIF}`, "#8a8a88"); foot.position.set(vw / 2, -(lastBottom + 240), 0); content.add(foot);
+    const foot = textPlane("Handshake — Rialo devnet", `400 13px ${SERIF}`, pal().mute); foot.position.set(vw / 2, -(lastBottom + 240), 0); content.add(foot);
     pageH = lastBottom + 240 + 80;
     scroll = target = clamp(scroll, 0, Math.max(0, pageH - vh));
     loadLive();
@@ -194,16 +195,24 @@ export function createDeals(): View {
     renderer.setRenderTarget(rt); renderer.render(scene, camera); renderer.setRenderTarget(null); renderer.render(postScene, postCam);
   }
   function build() {
-    renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(dpr()); renderer.setClearColor("#0c0c0d", 1); stage.appendChild(renderer.domElement);
-    scene = new THREE.Scene(); scene.background = new THREE.Color("#0c0c0d"); scene.add(content);
+    renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(dpr()); renderer.setClearColor(pal().bg, 1); stage.appendChild(renderer.domElement);
+    scene = new THREE.Scene(); scene.background = new THREE.Color(pal().bg); scene.add(content);
     camera = new THREE.PerspectiveCamera(35, 1, 1, 8000);
     rt = new THREE.WebGLRenderTarget(2, 2, { samples: 4, type: THREE.HalfFloatType });
     postScene = new THREE.Scene(); postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     post = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ vertexShader: TILE_V, fragmentShader: POST_F, uniforms: { tDiffuse: { value: rt.texture } } })); postScene.add(post);
-    layout(); built = true;
+    layout(); built = true; onTheme(restyle);
     stage.addEventListener("wheel", onWheel, { passive: true }); stage.addEventListener("pointermove", onMove); stage.addEventListener("click", onClick);
     stage.addEventListener("touchstart", onTS, { passive: true }); stage.addEventListener("touchmove", onTM, { passive: true }); stage.addEventListener("touchend", onTE);
     stage.addEventListener("pointerleave", () => setHover(-1));
+  }
+  /** Rebuilds the grid in the new theme, in place: same scroll, no entrance replay. */
+  function restyle() {
+    if (!built) return;
+    renderer.setClearColor(pal().bg, 1); (scene.background as THREE.Color).set(pal().bg);
+    const keep = target; layout(); target = scroll = clamp(keep, 0, Math.max(0, pageH - vh));
+    if (headline) { (headline.mesh.material as THREE.MeshBasicMaterial).opacity = 1; headline.draw(1); }
+    tiles.forEach((t) => { t.mesh.visible = true; t.entered = true; (t.mesh.userData as { place: (d: number) => void }).place(0); [t.chip, t.title, t.cat].forEach((o) => { (o.material as THREE.Material & { opacity: number }).opacity = 1; }); });
   }
   const api: View = {
     show() {
