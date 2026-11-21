@@ -175,7 +175,7 @@ export function createDeals(): View {
   }
   function onClick(e: MouseEvent) {
     if (!running || Math.abs(clickDrag) > 8) return; const r = stage.getBoundingClientRect(); const i = tileAt(e.clientX - r.left, e.clientY - r.top);
-    if (i < 0) return; const t = tiles[i]!; if (t.kind === "new") openNewDeal(() => { key = ""; }); else location.hash = `deal/${t.item.address}`;
+    if (i < 0) return; const t = tiles[i]!; if (t.kind === "new") openNewDeal(() => { setTimeout(() => api.refresh?.(), 300); }); else location.hash = `deal/${t.item.address}`;
   }
   let clickDrag = 0;
   const onWheel = (e: WheelEvent) => { target = clamp(target + e.deltaY, 0, Math.max(0, pageH - vh)); };
@@ -205,7 +205,7 @@ export function createDeals(): View {
     stage.addEventListener("touchstart", onTS, { passive: true }); stage.addEventListener("touchmove", onTM, { passive: true }); stage.addEventListener("touchend", onTE);
     stage.addEventListener("pointerleave", () => setHover(-1));
   }
-  return {
+  const api: View = {
     show() {
       if (!built) build(); else if (key !== sources().map((s) => s.item.id).join("|")) { layout(); firstShow = true; }
       running = true; if (!raf) raf = requestAnimationFrame(frame);
@@ -216,4 +216,5 @@ export function createDeals(): View {
     resize() { if (built) { layout(); firstShow = false; entrance(); } },
     refresh() { if (built && running) { const keep = target; layout(); target = scroll = clamp(keep, 0, Math.max(0, pageH - vh)); entrance(); } },
   };
+  return api;
 }
