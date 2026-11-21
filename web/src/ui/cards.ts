@@ -25,9 +25,14 @@ export function drawStill(it: Item, chip = false): HTMLCanvasElement {
   g.fillStyle = "#8a8a88"; g.font = `500 28px ${SANS}`; g.textBaseline = "top"; if (!chip) g.fillText(it.category, 32, 30);
   g.textAlign = "right"; g.fillText(it.meta, W - 32, 30); g.textAlign = "left";
   if (it.face === "deal") return drawDealBody(g, c, it);
-  g.fillStyle = "#ededeb"; g.font = `300 84px ${SERIF}`;
-  const lines = wrap(g, it.title, W - 64); let y = H - 36 - lines.length * 86;
-  for (const l of lines) { g.fillText(l, 32, y); y += 86; }
+  g.fillStyle = "#ededeb"; g.font = `300 66px ${SERIF}`;
+  const lines = wrap(g, it.title, W - 64).slice(0, 2); let y = 84;
+  for (const l of lines) { g.fillText(l, 32, y); y += 68; }
+  const sentence = (/^[^.]*\./.exec(it.description)?.[0] ?? it.description);
+  g.fillStyle = "#8a8a88"; g.font = `400 25px ${SANS}`;
+  const sum = wrap(g, sentence, W - 64).slice(0, 3); let sy = H - 28 - sum.length * 32;
+  g.fillStyle = ACC[it.face]!; g.globalAlpha = .7; g.fillRect(32, sy - 14, 44, 3); g.globalAlpha = 1; g.fillStyle = "#8a8a88";
+  for (const l of sum) { g.fillText(l, 32, sy); sy += 32; }
   return c;
 }
 function drawDealBody(g: CanvasRenderingContext2D, c: HTMLCanvasElement, it: Item) {
@@ -42,7 +47,9 @@ function drawDealBody(g: CanvasRenderingContext2D, c: HTMLCanvasElement, it: Ite
     g.fillStyle = "#ededeb"; g.font = `500 20px ${SANS}`; g.fillText(`${fmtRlo(m.amount)} RLO`, x + 10, 172);
     g.fillStyle = col; g.font = `italic 300 22px ${SERIF}`; g.fillText(phaseName(m.status), x + 10, 208);
   });
-  g.fillStyle = "#8a8a88"; g.font = `500 20px ${SANS}`; g.fillText(`Seller ${short(d.payee)}`, 32, H - 52);
+  const tot = d.milestones.reduce((n, m) => n + m.amount, 0n), done = d.milestones.filter((m) => m.status >= 3n).length;
+  g.fillStyle = "#8a8a88"; g.font = `500 22px ${SANS}`; g.fillText(`Total ${fmtRlo(tot)} RLO`, 32, H - 56);
+  g.textAlign = "right"; g.fillText(`${done} of ${d.milestones.length} settled · ${short(d.payee)}`, W - 32, H - 56); g.textAlign = "left";
   return c;
 }
 /** Second face shown on hover: the description. */

@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
-    "e2e": "tsx scripts/e2e.ts"
+    "e2e": "tsx scripts/e2e.ts",
+    "e2e:presets": "tsx scripts/presets-e2e.ts"
   },
   "dependencies": {
     "@noble/hashes": "2.0.0",

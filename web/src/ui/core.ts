@@ -9,4 +9,4 @@ export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 export const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 export const SANS = '"Geist", ui-sans-serif, system-ui, sans-serif';
 export const SERIF = '"Newsreader", ui-serif, Georgia, serif';
-export interface View { show(): void; hide(): void; resize(): void }
+export interface View { show(): void; hide(): void; resize(): void; refresh?(): void }

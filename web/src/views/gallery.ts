@@ -19,7 +19,7 @@ export function createGallery(onReady: () => void): View {
   const cfg = () => {
     // Spec sizes (104 / 250 px) are tuned for video previews. These cards carry text, so desktop is scaled 1.45x.
     const w = innerWidth, mid = w > 1024 && w <= 1440, k = (mid ? 0.8 : 1) * 1.45;
-    const plane = w <= 640 ? 96 : 104 * k;
+    const plane = w <= 640 ? 104 : 104 * k;
     return { r: 250 * k, plane, center: plane * 120 / 82, phone: w <= 640 };
   };
   let loaded = 0;
@@ -39,8 +39,8 @@ export function createGallery(onReady: () => void): View {
     base.length = 0;
     for (let i = 0; i < N; i++) {
       const y = i * (2 / N) - 1 + 1 / N, r = Math.sqrt(1 - y * y), a = Math.PI * (3 - Math.sqrt(5)) * i;
-      const R = c.phone ? vw / 2 - 24 - c.plane / 2 : c.r;
-      base.push(new THREE.Vector3(Math.cos(a) * r * R, y * R, Math.sin(a) * r * R).multiplyScalar(unit));
+      const Rx = c.phone ? vw / 2 - 24 - c.plane / 2 : c.r, Ry = c.phone ? Math.min(vh * .3, Rx * 1.55) : c.r; // phones are tall: stretch the sphere vertically so cards overlap less
+      base.push(new THREE.Vector3(Math.cos(a) * r * Rx, y * Ry, Math.sin(a) * r * Rx).multiplyScalar(unit));
     }
   }
   const setScale = (m: THREE.Mesh, longerPx: number): void => { m.scale.set(px(longerPx), px(longerPx) * 9 / 16, 1); };

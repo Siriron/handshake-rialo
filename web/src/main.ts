@@ -1,5 +1,5 @@
 import { $, $$, gsap, reduced, type View } from "./ui/core";
-import { initWallet, onWallet, balance } from "./session";
+import { initWallet, onWallet, balance, wallet } from "./session";
 import { fmtRlo } from "./lib/format";
 import { close as closeLb, openDeal, openWallet } from "./ui/panels";
 import { createGallery } from "./views/gallery";
@@ -45,7 +45,13 @@ menu.querySelectorAll("a").forEach((a) => a.addEventListener("click", () => setM
 $("#walletOpen").addEventListener("click", () => { setMenu(false); openWallet(); });
 addEventListener("keydown", (e) => e.key === "Escape" && setMenu(false));
 document.addEventListener("pointerdown", (e) => { if (!menu.contains(e.target as Node) && e.target !== btn) setMenu(false); });
-onWallet(() => { $("#walletBal").textContent = balance == null ? "—" : `${fmtRlo(balance, 2)} RLO`; });
+let lastAddr: string | null | undefined;
+onWallet(() => {
+  $("#walletBal").textContent = !wallet ? "Disconnected" : balance == null ? "—" : `${fmtRlo(balance, 2)} RLO`;
+  const a = wallet?.address ?? null;
+  if (lastAddr !== undefined && a !== lastAddr && current) views[current]?.refresh?.(); // account changed: refresh in place, no reload
+  lastAddr = a;
+});
 addEventListener("hashchange", () => { if (!location.hash.startsWith("#deal/")) closeLb(); void go(); });
 addEventListener("resize", () => current && views[current]?.resize());
 if (reduced) document.documentElement.style.scrollBehavior = "auto";

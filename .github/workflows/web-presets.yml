@@ -1,0 +1,41 @@
+# Runs every demo preset on devnet through the form's own plan and checks how each ends.
+# Output goes to the web-presets-results branch.
+name: web-presets
+on: workflow_dispatch
+permissions:
+  contents: read
+concurrency:
+  group: devnet
+  cancel-in-progress: false
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # only to publish the output branch
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: run
+        working-directory: web
+        shell: bash
+        run: |
+          mkdir -p /tmp/report
+          npm ci > /dev/null 2>&1
+          npm run e2e:presets 2>&1 | tee /tmp/report/presets.log
+          true
+      - name: publish output
+        if: always()
+        shell: bash
+        run: |
+          cd /tmp/report
+          git init -q; git checkout -q -b web-presets-results
+          git config user.name "github-actions"; git config user.email "actions@users.noreply.github.com"
+          echo "commit: $GITHUB_SHA run: $GITHUB_RUN_ID" > run.txt
+          git add -A; git commit -q -m "web presets output for $GITHUB_SHA"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" web-presets-results

@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { $, clamp, gsap, isTouch, reduced, SANS, SERIF, type View } from "../ui/core";
 import { VERIFIED_DEALS, dealItem, type Item } from "../data";
 import { drawDetail, drawStill, drawText } from "../ui/cards";
-import { client, loadDeals } from "../session";
+import { client, myDeals } from "../session";
 import { readDeal } from "../lib/rialo/chain";
 import { openNewDeal } from "../ui/panels";
 
@@ -33,7 +33,7 @@ void main(){ const float band=.08; vec2 uv=vUv; float t=0.,dir=0.;
  gl_FragColor=vec4(enc(col),1.); }`;
 
 interface Tile { item: Item; kind: "new" | "deal"; mesh: THREE.Mesh; chip: THREE.Mesh; title: THREE.Mesh; cat: THREE.Mesh; still: THREE.CanvasTexture; hover: THREE.CanvasTexture;
-  x: number; y: number; w: number; h: number; mix: number; reveal: number; shown: boolean; col: number; row: number }
+  x: number; y: number; w: number; h: number; mix: number; reveal: number; shown: boolean; col: number; row: number; idx: string; entered: boolean; lastMix: number }
 
 export function createDeals(): View {
   const root = $("#projects"), stage = $("#pStage"), bubble = $("#viewBubble");
@@ -56,7 +56,7 @@ export function createDeals(): View {
   }
 
   function sources(): { item: Item; kind: "new" | "deal" }[] {
-    const mine = loadDeals().map((d) => ({ item: dealItem(d.address, "Your deal"), kind: "deal" as const }));
+    const mine = myDeals().map((d) => ({ item: dealItem(d.address, "Your deal"), kind: "deal" as const }));
     const seen = new Set(mine.map((m) => m.item.address));
     const ver = VERIFIED_DEALS.filter((d) => !seen.has(d.address)).map((d) => ({ item: dealItem(d.address, d.label), kind: "deal" as const }));
     return [{ item: newItem(), kind: "new" }, ...mine, ...ver];
@@ -67,6 +67,19 @@ export function createDeals(): View {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false })); m.scale.set(w, h, 1); void wPx; return m;
   }
 
+  function chipFor(label: string) {
+    const lc = drawText(label, `500 12px ${SANS}`, "#ededeb", dpr()), cw = lc.width / dpr() + 16, chh = lc.height / dpr() / 1.5 + 10;
+    const cc = document.createElement("canvas"); cc.width = Math.ceil(cw * dpr()); cc.height = Math.ceil(chh * dpr()); cc.getContext("2d")!.drawImage(lc, 8 * dpr(), 6 * dpr()); return { cc, cw, chh };
+  }
+  function setChip(t: Tile, label: string) {
+    const { cc, cw, chh } = chipFor(label), mat = t.chip.material as THREE.ShaderMaterial, tex = mat.uniforms.uLabel!.value as THREE.CanvasTexture;
+    tex.image = cc; tex.needsUpdate = true; (mat.uniforms.uSize!.value as THREE.Vector2).set(cw, chh); (mat.uniforms.uRect!.value as THREE.Vector4).set(8 / t.w, 1 - (8 + chh) / t.h, cw / t.w, chh / t.h);
+    t.chip.scale.set(cw, chh, 1); (t.mesh.userData as { place: (d: number) => void }).place(0);
+  }
+  const stateWord = (it: Item) => {
+    const m = it.live?.deal.milestones; if (!m?.length) return null; const p = m.filter((x) => x.status === 3n).length, r = m.filter((x) => x.status === 4n).length;
+    if (p + r === m.length) return r === 0 ? "Paid" : p === 0 ? "Refunded" : "Settled"; return m.some((x) => x.status === 2n) ? "Checking" : m.some((x) => x.status === 1n) ? "Funded" : "Not funded";
+  };
   function clearScene() { content.clear(); tiles.length = 0; extras.length = 0; headline = null; }
   function layout() {
     vw = stage.clientWidth; vh = stage.clientHeight;
@@ -103,9 +116,7 @@ export function createDeals(): View {
       const mat = new THREE.ShaderMaterial({ vertexShader: TILE_V, fragmentShader: TILE_F, uniforms: { uTex: { value: still }, uTex2: { value: hover }, uMix: { value: 0 }, uReveal: { value: s.kind === "new" ? 1 : 0 }, uTime: timeU } });
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat); mesh.scale.set(tw, th, 1);
       // chip
-      const idx = String(i + 1).padStart(2, "0"), label = `${idx}  ${s.item.category}`, lc = drawText(label, `500 12px ${SANS}`, "#ededeb", dpr());
-      const cw = lc.width / dpr() + 16, chh = lc.height / dpr() / 1.5 + 10, lt = toTex(lc);
-      const cc = document.createElement("canvas"); cc.width = Math.ceil(cw * dpr()); cc.height = Math.ceil(chh * dpr()); const cg = cc.getContext("2d")!; cg.drawImage(lc, 8 * dpr(), 6 * dpr()); void lt; const ct = toTex(cc);
+      const idx = String(i + 1).padStart(2, "0"), { cc, cw, chh } = chipFor(`${idx}  ${s.item.category}`), ct = toTex(cc);
       const chipMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, vertexShader: TILE_V, fragmentShader: CHIP_F, uniforms: { uTex: { value: still }, uTex2: { value: hover }, uLabel: { value: ct }, uMix: mat.uniforms.uMix!, uReveal: mat.uniforms.uReveal!, uTile: { value: new THREE.Vector2(tw, th) }, uSize: { value: new THREE.Vector2(cw, chh) }, uRect: { value: new THREE.Vector4(8 / tw, 1 - (8 + chh) / th, cw / tw, chh / th) } } });
       const chip = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), chipMat); chip.scale.set(cw, chh, 1);
       const title = textPlane(s.item.title, `500 12px ${SANS}`, "#ededeb"), cat = textPlane(`${s.item.category}, ${s.item.meta}`, `400 13px ${SERIF}`, "#8a8a88");
@@ -115,7 +126,7 @@ export function createDeals(): View {
         const tw_ = title.scale.x, cw_ = cat.scale.x; title.position.set(x + tw_ / 2, -(y + th + 12 + title.scale.y / 2) - dy, 0); cat.position.set(x + cw_ / 2, -(y + th + 12 + title.scale.y + 6 + cat.scale.y / 2) - dy, 0);
       };
       place(); (mesh.userData as { place: (d: number) => void }).place = place;
-      tiles.push({ item: s.item, kind: s.kind, mesh, chip, title, cat, still, hover, x, y, w: tw, h: th, mix: 0, reveal: s.kind === "new" ? 1 : 0, shown: false, col, row });
+      tiles.push({ item: s.item, kind: s.kind, mesh, chip, title, cat, still, hover, x, y, w: tw, h: th, mix: 0, reveal: s.kind === "new" ? 1 : 0, shown: false, col, row, idx, entered: false, lastMix: 0 });
       [chip, title, cat].forEach((o) => { (o.material as THREE.Material & { opacity: number }).opacity = 0; });
       mesh.visible = false;
     });
@@ -132,6 +143,7 @@ export function createDeals(): View {
       try { live = await readDeal(client, addr); } catch { live = null; }
       if (!tiles.includes(t)) return; t.item.live = live;
       (t.still.image as HTMLCanvasElement) = drawStill(t.item, true); t.still.needsUpdate = true; (t.hover.image as HTMLCanvasElement) = drawDetail(t.item); t.hover.needsUpdate = true;
+      const sw = stateWord(t.item); if (sw) setChip(t, `${t.idx}  ${sw}`);
       gsap.to(t, { reveal: 1, duration: .8, ease: "power2.out", onUpdate: () => { (t.mesh.material as THREE.ShaderMaterial).uniforms.uReveal!.value = t.reveal; } });
     }
   }
@@ -140,7 +152,7 @@ export function createDeals(): View {
     if (headline) { const m = headline.mesh.material as THREE.MeshBasicMaterial; gsap.to(m, { opacity: 1, duration: .3 }); const o = { p: 0 }; if (reduced) headline.draw(1); else gsap.to(o, { p: 1, duration: 1.1, ease: "power2.out", onUpdate: () => headline!.draw(o.p) }); }
     tiles.forEach((t) => {
       t.mesh.visible = true; const place = (t.mesh.userData as { place: (d: number) => void }).place; const o = { dy: -60 };
-      const parts = [t.chip, t.title, t.cat];
+      const parts = [t.chip, t.title, t.cat]; t.entered = false; gsap.delayedCall(dly(t) + (reduced ? 0 : 1.2), () => { t.entered = true; });
       gsap.to(o, { dy: 0, duration: reduced ? 0 : 1.2, ease: "expo.out", delay: dly(t), onUpdate: () => place(o.dy) });
       parts.forEach((p) => gsap.to(p.material as THREE.Material, { opacity: 1, duration: reduced ? 0 : .9, ease: "power2.out", delay: dly(t) }));
       gsap.fromTo(t.mesh.material, {}, {}); (t.mesh.material as THREE.ShaderMaterial).transparent = true;
@@ -178,7 +190,7 @@ export function createDeals(): View {
     scroll += (target - scroll) * .12; content.position.y = scroll;
     const compact = vw <= 1024 || isTouch;
     if (compact && tiles.length) { let best = 0, bd = 1e9; tiles.forEach((tt, i) => { const d = Math.abs(tt.y + tt.h / 2 - scroll - vh / 2); if (d < bd) (bd = d, (best = i)); }); tiles.forEach((tt, i) => { const m = i === best ? 1 : 0; tt.mix += (m - tt.mix) * .1; }); }
-    tiles.forEach((tt) => { (tt.mesh.material as THREE.ShaderMaterial).uniforms.uMix!.value = tt.mix; });
+    tiles.forEach((tt) => { (tt.mesh.material as THREE.ShaderMaterial).uniforms.uMix!.value = tt.mix; if (tt.entered && Math.abs(tt.mix - tt.lastMix) > .002 && !compact) { tt.lastMix = tt.mix; (tt.mesh.userData as { place: (d: number) => void }).place(-tt.mix * 6); } });
     renderer.setRenderTarget(rt); renderer.render(scene, camera); renderer.setRenderTarget(null); renderer.render(postScene, postCam);
   }
   function build() {
@@ -202,5 +214,6 @@ export function createDeals(): View {
     },
     hide() { running = false; setHover(-1); cancelAnimationFrame(raf); raf = 0; },
     resize() { if (built) { layout(); firstShow = false; entrance(); } },
+    refresh() { if (built && running) { const keep = target; layout(); target = scroll = clamp(keep, 0, Math.max(0, pageH - vh)); entrance(); } },
   };
 }
