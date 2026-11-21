@@ -26,7 +26,7 @@ export async function sendIx(client: Client, signer: Signer, ix: Instruction): P
     .addInstruction(ix)
     .build();
   const signed = await tx.signWith(signer);
-  const res = await client.sendAndConfirmTransaction(signed.serialize(), {});
+  const res = await client.sendAndConfirmTransaction(signed.serialize(), { confirmMaxRetries: 90, confirmRetryDelayMs: 1000 });
   if (!res.executed || res.err) throw new Error(res.err ?? "transaction was not executed");
   return res.signature;
 }
