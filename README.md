@@ -1,13 +1,40 @@
-# Handshake
+<div align="center">
 
-**Milestone payments that complete themselves.** A buyer locks funds against up to four milestones. When a milestone's deadline passes, the Rialo network itself checks real-world evidence and then pays the seller or refunds the buyer. There is no arbiter to trust, no oracle to run, no bot to keep alive, and nobody has to press a button after the deal is funded.
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="assets/banner-light.png">
+  <img alt="Handshake: pay when the work ships" src="assets/banner-dark.png" width="100%">
+</picture>
 
-[![ci](https://github.com/Siriron/handshake-rialo/actions/workflows/ci.yml/badge.svg)](https://github.com/Siriron/handshake-rialo/actions/workflows/ci.yml)
-[![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-![network](https://img.shields.io/badge/network-Rialo%20devnet-informational)
-![status](https://img.shields.io/badge/status-devnet%20only%2C%20not%20audited-orange)
+<p>
+  <a href="https://handshake-xyz.vercel.app"><b>Open the app</b></a> &nbsp;·&nbsp;
+  <a href="docs/EVIDENCE.md">Evidence</a> &nbsp;·&nbsp;
+  <a href="docs/THREAT_MODEL.md">Threat model</a> &nbsp;·&nbsp;
+  <a href="SECURITY.md">Security</a>
+</p>
 
-> **Status: devnet.** The on-chain program and its verifiers are deployed and exercised on Rialo devnet (see [Evidence](#evidence)). It has not had an external security review and must not hold real value. A web frontend is in development and is not part of this repository yet.
+<p>
+  <a href="https://github.com/Siriron/handshake-rialo/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/Siriron/handshake-rialo/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/Siriron/handshake-rialo/actions/workflows/web-ci.yml"><img alt="web-ci" src="https://github.com/Siriron/handshake-rialo/actions/workflows/web-ci.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-Apache--2.0-blue.svg"></a>
+  <img alt="network" src="https://img.shields.io/badge/network-Rialo%20devnet-informational">
+  <img alt="status" src="https://img.shields.io/badge/status-devnet%20only%2C%20not%20audited-orange">
+</p>
+
+</div>
+
+**Milestone payments that complete themselves.** A buyer locks funds against up to four milestones. When a milestone's deadline passes, the Rialo network itself checks real-world evidence on GitHub and then pays the seller or refunds the buyer. After funding, nobody has to press a button: no keeper, no oracle, no manual step.
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="assets/flow-light.png">
+  <img alt="Create, add milestones, fund, check, settle" src="assets/flow-dark.png" width="100%">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="assets/stats-light.png">
+  <img alt="6 live scenarios, 23 core tests, 5 demo deals settled on devnet, 11 client tests" src="assets/stats-dark.png" width="100%">
+</picture>
+
+> **Status: devnet.** The on-chain program, its verifiers and the web app are deployed and exercised on Rialo devnet (see [Evidence](#evidence)). It has not had an external security review and must not hold real value.
 
 ---
 
@@ -18,6 +45,7 @@
 3. [Verifiers](#verifiers)
 4. [Why this needs Rialo](#why-this-needs-rialo)
 5. [Using a deal](#using-a-deal)
+   - [The web app](#the-web-app)
 6. [Rules and limits](#rules-and-limits)
 7. [Money flow and costs](#money-flow-and-costs)
 8. [Security model](#security-model)
@@ -159,6 +187,22 @@ Everything else (the heartbeat, the checks, the settlement) is internal and runs
 
 > **CLI note.** `rialo client program invoke` only *submits* a transaction. Wait for each call to land before sending the next one that depends on it; the repository's test workflow does this by polling `rialo client transaction <signature>` for a status.
 
+## The web app
+
+The `web/` folder holds the app: a sphere of cards to explore, a grid of deals where you create, open and approve them, and a proof page. It runs on Rialo devnet, in day or night mode.
+
+- **Create a deal in a minute.** The New deal form has a "Load demo deal" menu with five presets (release ships, PR never merged, two milestones delivered, mixed outcome, approve early). Each preset was run on devnet through the same code the form uses and ended as described. A deal costs about 0.024 RLO beyond the milestone amounts.
+- **Throwaway wallet.** The app makes a devnet account in your browser and lets you keep several and switch between them without a page reload. It is for test funds only and is not a place for real value.
+- **How it talks to the chain.** The devnet RPC sends no CORS headers, so the app calls a small same-origin relay (`web/api/rpc.ts`) that forwards only read and send methods. Deal addresses, instruction bytes and the account layout are derived in `web/src/lib/rialo/` and checked by tests against transactions and accounts recorded from devnet.
+- **Deploy.** Import the repository in Vercel and set Root Directory to `web`. Optional environment variable: `RIALO_RPC`.
+
+```bash
+cd web && npm ci
+npm run dev       # proxies /api/rpc to devnet
+npm test          # client logic against recorded devnet data
+npm run build
+```
+
 ## Rules and limits
 
 | rule | value | why |
@@ -228,7 +272,11 @@ handshake-rialo/
 ├── docs/
 │   ├── THREAT_MODEL.md    trust assumptions, attacks considered, known gaps
 │   └── EVIDENCE.md        devnet signatures, logs, defects found, unverified paths
-├── .github/workflows/     ci, deploy-devnet, test-scenarios
+├── web/                   the app (Vite, TypeScript, Three.js) and its devnet test scripts
+│   ├── src/lib/rialo/     deal address, instruction bytes, account decoder
+│   └── api/rpc.ts         same-origin relay to the devnet RPC
+├── assets/                images used by this README
+├── .github/workflows/     ci, web-ci, deploy-devnet, test-scenarios, web-e2e, web-presets
 ├── rust-toolchain.toml    pins Rust 1.90.0 (see Build, test, deploy)
 ├── SECURITY.md
 └── LICENSE
@@ -255,6 +303,7 @@ cargo check  --manifest-path program/Cargo.toml
 
 - `deploy-devnet` builds the artifact and deploys it with persistent keys held as repository secrets (`HS_DEPLOYER_KEYPAIR`, `HS_PROGRAM_KEYPAIR`, `HS_REX_KEYPAIR`). It verifies the keys load to the pinned addresses and fails loudly if the expected program and REX addresses are not reported.
 - `test-scenarios` runs the live scenarios against the deployed program and fails the job if any assertion fails.
+- `web-e2e` and `web-presets` run the web app's own code against devnet with throwaway keys and no secrets. The first creates, funds, approves, pays and refunds a deal; the second runs every demo preset and checks how it ends. `web-ci` type-checks, tests and builds the app on every push to `web/`.
 
 Both are manual (`workflow_dispatch`), scope the keys to a single step, and run one at a time. The program and REX addresses are deterministic because the deploy passes fixed keypairs; the REX address is pinned in `program/src/lib.rs` as `AUTHORIZED_REX`.
 
@@ -278,7 +327,7 @@ Both are manual (`workflow_dispatch`), scope the keys to a single step, and run 
 - **GitHub rate limits.** Unauthenticated GitHub API access is limited per source address (roughly 60 requests per hour). If validators share addresses, checks can come back inconclusive, which refunds the buyer.
 - **Heartbeat liveness is assumed.** If a timer transaction ever failed outright, a deal would stall with its funds locked. None has been observed.
 - **Not yet exercised on devnet:** a hand-built transaction calling an internal handler directly (the CLI cannot make one), a forged report argument sent on chain, the stuck-check rescue, and a check pipeline that fails every time. The decision logic for the last two is covered by the simulation test. These are listed in [`docs/EVIDENCE.md`](docs/EVIDENCE.md).
-- **Frontend:** in development, not part of this repository yet.
+- **Web app:** devnet only, with a throwaway browser wallet. Its chain code and every demo preset were exercised on devnet by test scripts; the deployed page's buttons were not driven end to end by an automated browser test.
 
 ## Deployed addresses
 

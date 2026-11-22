@@ -161,3 +161,17 @@ overwritten by the next run).
   pipeline that fails every time: unit tests and a simulation only; neither has
   triggered on chain.
 - Deals longer than a few minutes.
+
+## Web client
+
+The web app's chain code (deal address, instruction bytes, account decoder, transaction sending) was run against devnet by scripts that use throwaway keys and no repository secrets. Output of the latest run is on the `web-e2e-results` and `web-presets-results` branches until the next run overwrites it.
+
+| run | what it did | result |
+| --- | --- | --- |
+| `web-e2e`, run 44429673810 | create, two milestones, fund, early approve, wait for a deadline | the approved milestone paid, the closed-unmerged PR milestone refunded, the deal ended with nothing held, the seller received exactly the approved amount |
+| `web-presets`, run 44844859228 | all five demo presets through the form's own plan | every preset ended as described: release paid, unmerged PR refunded, two milestones both paid, mixed paid then refunded, early approval paid |
+
+Eleven unit tests check the address derivation, the instruction bytes and the account decoder against transactions and accounts recorded from devnet (probe run 44246793737).
+
+**Not verified:** the deployed page's buttons were not driven by an automated browser against live devnet. The scripts above cover the same code path but not the page itself.
+
