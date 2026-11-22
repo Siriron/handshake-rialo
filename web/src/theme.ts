@@ -8,7 +8,7 @@ export interface Palette {
 }
 export const PAL: Record<Resolved, Palette> = {
   dark: { bg: "#0c0c0d", ink: "#ededeb", mute: "#8a8a88", cardA: "#19191b", cardB: "#111113", faint: "#1b1b1d", edge: "#8a8a88", paid: "#8fcfa0", refunded: "#e3b567", funded: "#8fa0ff", chipTint: 0.05, skeleton: 0.085, dark: true },
-  light: { bg: "#eeeeec", ink: "#141415", mute: "#5d5d5a", cardA: "#fafaf8", cardB: "#e6e6e2", faint: "#dcdcd8", edge: "#6c6c69", paid: "#1f7a3d", refunded: "#96620a", funded: "#3d4fd6", chipTint: 0.93, skeleton: 0.8, dark: false },
+  light: { bg: "#e5e5e2", ink: "#141415", mute: "#55554f", cardA: "#ffffff", cardB: "#f4f4f1", faint: "#d4d4d0", edge: "#6c6c69", paid: "#1f7a3d", refunded: "#96620a", funded: "#3d4fd6", chipTint: 0.93, skeleton: 0.8, dark: false },
 };
 
 export let mode: Mode = "auto";

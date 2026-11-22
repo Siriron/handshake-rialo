@@ -14,9 +14,12 @@ function wrap(g: CanvasRenderingContext2D, text: string, maxW: number): string[]
   if (line) out.push(line); return out;
 }
 function base(g: CanvasRenderingContext2D, accent: string) {
-  const bg = g.createLinearGradient(0, 0, W, H); bg.addColorStop(0, pal().cardA); bg.addColorStop(1, pal().cardB);
+  const p = pal(), bg = g.createLinearGradient(0, 0, W, H); bg.addColorStop(0, p.cardA); bg.addColorStop(1, p.cardB);
   g.fillStyle = bg; g.fillRect(0, 0, W, H);
-  g.strokeStyle = accent; g.globalAlpha = .55; g.lineWidth = 2; g.strokeRect(1, 1, W - 2, H - 2); g.globalAlpha = 1;
+  if (p.dark) { g.strokeStyle = accent; g.globalAlpha = .55; g.lineWidth = 2; g.strokeRect(1, 1, W - 2, H - 2); g.globalAlpha = 1; return; }
+  // Day mode: white cards on a grey page need a firm edge and a colour band to stand apart.
+  g.strokeStyle = accent; g.globalAlpha = .85; g.lineWidth = 4; g.strokeRect(2, 2, W - 4, H - 4); g.globalAlpha = 1;
+  g.fillStyle = accent; g.fillRect(0, 0, W, 12);
 }
 const acc = (face: string) => { const p = pal(); return ({ rule: p.edge, verified: p.paid, open: p.refunded, deal: p.funded } as Record<string, string>)[face]!; };
 
